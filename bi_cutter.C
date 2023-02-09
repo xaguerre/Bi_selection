@@ -189,15 +189,83 @@ int calo_source_track(int compteur_source[][6], int compteur_calo[][20], int cal
   return 0;
 }
 
-// void backtoback(){
+// void backtoback() {
+//   TFile *file = new TFile("test.root", "READ");
+//   double charge;
+//   int eventnumber, om_number, calo_nohits;
+//   vector<int> tracker_side;
+//   vector<int> tracker_layer;
+//   vector<int> tracker_column;
 //
+//   TTree* tree = (TTree*)file->Get("Result_tree");
+//   tree->SetBranchStatus("*",0);
+//   tree->SetBranchStatus("om_number",1);
+//   tree->SetBranchAddress("om_number", &om_number);
+//   tree->SetBranchStatus("calo_nohits",1);
+//   tree->SetBranchAddress("calo_nohits", &calo_nohits);
+//   tree->SetBranchStatus("charge",1);
+//   tree->SetBranchAddress("charge", &charge);
+//   tree->SetBranchStatus("tracker_side",1);
+//   tree->SetBranchAddress("tracker_side", &tracker_side);
+//   tree->SetBranchStatus("tracker_side",1);
+//   tree->SetBranchAddress("tracker_side", &tracker_side);
+//   tree->SetBranchStatus("tracker_column",1);
+//   tree->SetBranchAddress("tracker_column", &tracker_column);
+//   tree->SetBranchStatus("eventnumber",1);
+//   tree->SetBranchAddress("eventnumber", &eventnumber);
 //
+//   TH2D spectre_ampl_backtoback("spectre_amp_backtobackl","spectre_ampl_backtoback", 520, 0, 520, 1000, 0, 20000);
+//   TH2D spectre_charge_backtoback("spectre_charge_backtoback","spectre_charge_backtoback", 520, 0, 520, 1000, 0, 60000);
 //
+//   TFile *newfile = new TFile("test_back.root", "RECREATE");
 //
+//   TTree Result_tree("Result_tree","");
+//   Result_tree.Branch("eventnumber", &eventnumber);
+//   Result_tree.Branch("om_number", &om_number);
+//   Result_tree.Branch("charge", &charge);
+//   Result_tree.Branch("tracker_hit_side", &tracker_hit_side);
+//   Result_tree.Branch("tracker_hit_layer", &tracker_hit_layer);
+//   Result_tree.Branch("tracker_hit_column", &tracker_hit_column);
+//
+//   std::vector<int> *event_vec = new std::vector<int>;
+//
+//   double prev_calo_hit = -1;
+//   int prev_eventnumber = -1;
+//
+//   for (int i = 0; i < 200; i++) {
+//     tree->GetEntry(i);
+//     if (prev_calo_hit != calo_hit && prev_eventnumber == eventnumber) {
+//       event_vec->push_back(eventnumber);
+//       // cout << "ok" << endl;
+//     }
+//     // cout << "om = " << calo_hit << " and prev = " << prev_calo_hit << "  <<   ev n = " << eventnumber  << " and prev = " << prev_eventnumber << endl;
+//     prev_calo_hit = calo_hit;
+//     prev_eventnumber = eventnumber;
+//   }
+//   // return;
+//   int j = 0;
+//   int compteur = 0;
+//   for (int i = 0; i < 200; i++) {
+//     tree->GetEntry(i);
+//
+//     cout <<"ev n = " << eventnumber  << " and prev = " << event_vec->at(j) << endl;
+//     if (eventnumber == event_vec->at(j)) {
+//       compteur = 1;
+//       Result_tree.Fill();
+//     }
+//     else if(compteur == 1) {
+//       j++;
+//       i-=1;
+//     }
+//     compteur = 0;
+//   }
+//   newfile->cd();
+//   Result_tree.Write();
+//   newfile->Close();
 // }
 
 void track_cutter() {
-  TFile *file = new TFile("snemo_run-902_udd.root", "READ");
+  TFile *file = new TFile("data/snemo_run-902_udd.root", "READ");
   std::vector<vector<short>> *wave = new std::vector<vector<short>>;
   std::vector<vector<long>> *R0 = new std::vector<vector<long>>;
   std::vector<vector<long>> *R5 = new std::vector<vector<long>>;
@@ -270,7 +338,8 @@ void track_cutter() {
 
   int compteur_source[2][6] = {0};
   int compteur_calo[2][20] = {0};
-  int om_num;
+  int om_num, electron_number, gamma_number, electron_event;
+  double charge, amplitude, calo_tdc;
   TFile *newfile = new TFile("test.root", "RECREATE");
 
   int calo_compteur_nohits = 0;
@@ -278,69 +347,103 @@ void track_cutter() {
   int event, calo_hit;
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("eventnumber", &event);
-  Result_tree.Branch("om_num", &om_num);
-  Result_tree.Branch("calo_nohits", &calo_compteur_nohits);
+  Result_tree.Branch("om_number", &om_num);
+  Result_tree.Branch("calo_nohits", &calo_nohits);
   Result_tree.Branch("calo_hit", &calo_hit);
+  Result_tree.Branch("calo_tdc", &calo_tdc);
+  Result_tree.Branch("charge", &charge);
+  Result_tree.Branch("amplitude", &amplitude);
   Result_tree.Branch("tracker_side", &cut_track_side);
   Result_tree.Branch("tracker_layer", &cut_track_layer);
   Result_tree.Branch("tracker_column", &cut_track_column);
   Result_tree.Branch("tracker_nohits", &tracker_compteur_nohits);
   Result_tree.Branch("last_column", &last_column);
   Result_tree.Branch("last_column_side", &last_column_side);
+  Result_tree.Branch("electron_number", &electron_number);
+  Result_tree.Branch("gamma_number", &gamma_number);
+  Result_tree.Branch("electron_event", &electron_event);
+
+
+  vector<int> electron;
+  vector<int> gamma;
+
 
   for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
-  // for (int i = 62; i < 63; i++) {      //loop on event number
+    // for (int i = 932; i < 933; i++) {      //loop on event number
     tree->GetEntry(i);
     event = i;
-    // if (calo_nohits < 3) {
+    for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
+      om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
+      memset(compteur_source, 0, sizeof(int) * 2 * 6);
+      memset(compteur_calo, 0, sizeof(int) * 2 * 20);
+      source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, timestamp->at(k));
+      calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *last_column, *last_column_side, *R0, timestamp->at(k), *cut_track_side, *cut_track_layer, *cut_track_column);
 
-      for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
-        om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
-        memset(compteur_source, 0, sizeof(int) * 2 * 6);
-        memset(compteur_calo, 0, sizeof(int) * 2 * 20);
-        source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, timestamp->at(k));
-        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *last_column, *last_column_side, *R0, timestamp->at(k), *cut_track_side, *cut_track_layer, *cut_track_column);
-        calo_hit = k;
+      if (-calo_ampl->at(k) > 200 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12 && tracker_nohits > 5 && tracker_nohits < 16) {      // condition to cut small charge and keep only MW OM
+        // if (-calo_ampl->at(k) > 200 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12) {      // condition to cut small charge and keep only MW OM
+        calo_compteur_nohits++;
+        spectre_ampl_full.Fill(om_num, -calo_ampl->at(k));            //TH2 on amplitude and charge spectra without cut
+        spectre_charge_full.Fill(om_num, -calo_charge->at(k));
 
-        // if (-calo_ampl->at(k) > 200 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12 && tracker_nohits > 5 && tracker_nohits < 16) {      // condition to cut small charge and keep only MW OM
-        if (-calo_ampl->at(k) > 200 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12) {      // condition to cut small charge and keep only MW OM
-          calo_compteur_nohits++;
-          spectre_ampl_full.Fill(om_num, -calo_ampl->at(k));            //TH2 on amplitude and charge spectra without cut
-          spectre_charge_full.Fill(om_num, -calo_charge->at(k));
-          // last_column_selecteur(*last_column, calo_column->at(k));
-
-          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && last_column->size() > 0){
-            for (int l = 0; l < tracker_side->size(); l++) {
-              if (tracker_side->at(l) == calo_side->at(k)) {
-                tracker_compteur_nohits++;
-              }
-              else {
-                tracker_side->at(l) = -1;
-                tracker_layer->at(l) = -1;
-                tracker_column->at(l) = -1;
-              }
+        if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && last_column->size() > 0){
+          electron.push_back(om_num);
+        }
+        else {
+          gamma.push_back(om_num);
+        }
+      }
+    }
+    for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
+      electron_number = electron.size();
+      gamma_number = gamma.size();
+      calo_hit = k;
+      event = i;
+      calo_tdc = timestamp->at(k);
+      charge = -calo_charge->at(k);
+      amplitude = -calo_ampl->at(k);
+      om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
+      if (electron.size() > 0) {
+        electron_event = 1;
+        if (electron.at(0) == om_num) {
+          for (int l = 0; l < tracker_side->size(); l++) {
+            if (tracker_side->at(l) == calo_side->at(k)) {
+              tracker_compteur_nohits++;
             }
-            spectre_ampl.Fill(om_num, -calo_ampl->at(k));           //TH2 on amplitude and charge spectra with cut
-            spectre_charge.Fill(om_num, -calo_charge->at(k));
-            Result_tree.Fill();
-
-            if (calo_nohits < 3) {
-              spectre_ampl_single.Fill(om_num, -calo_ampl->at(k));
-              spectre_charge_single.Fill(om_num, -calo_charge->at(k));
+            else {
+              tracker_side->at(l) = -1;
+              tracker_layer->at(l) = -1;
+              tracker_column->at(l) = -1;
             }
           }
-          // if (calo_side->at(k) == 1) return;
+          spectre_ampl.Fill(om_num, -calo_ampl->at(k));           //TH2 on amplitude and charge spectra with cut
+          spectre_charge.Fill(om_num, -calo_charge->at(k));
+          Result_tree.Fill();
+
+          if (calo_nohits < 3) {
+            spectre_ampl_single.Fill(om_num, -calo_ampl->at(k));
+            spectre_charge_single.Fill(om_num, -calo_charge->at(k));
+          }
+          electron.erase(electron.begin());
         }
-        cut_track_side->clear();
-        cut_track_layer->clear();
-        cut_track_column->clear();
-        last_column->clear();
-        last_column_side->clear();
       }
-    // }
+      else if (gamma.size() > 0) {
+        electron_event = 0;
+        if (gamma.at(0) == om_num) {
+          Result_tree.Fill();
+          gamma.erase(gamma.begin());
+        }
+      }
+    }
+    cut_track_side->clear();
+    cut_track_layer->clear();
+    cut_track_column->clear();
+    last_column->clear();
+    last_column_side->clear();
+
+    gamma.clear();
+    electron.clear();
     calo_compteur_nohits = 0;
     tracker_compteur_nohits = 0;
-
   }
 
 
@@ -520,72 +623,6 @@ void track_cutter() {
 // }
 //
 
-void backtoback() {
-  TFile *file = new TFile("test.root", "READ");
-  double calo_hit, tracker_hit_side, tracker_hit_layer, tracker_hit_column;
-  int eventnumber;
-
-  TTree* tree = (TTree*)file->Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("calo_hit",1);
-  tree->SetBranchAddress("calo_hit", &calo_hit);
-  tree->SetBranchStatus("tracker_hit_side",1);
-  tree->SetBranchAddress("tracker_hit_side", &tracker_hit_side);
-  tree->SetBranchStatus("tracker_hit_side",1);
-  tree->SetBranchAddress("tracker_hit_side", &tracker_hit_side);
-  tree->SetBranchStatus("tracker_hit_column",1);
-  tree->SetBranchAddress("tracker_hit_column", &tracker_hit_column);
-  tree->SetBranchStatus("eventnumber",1);
-  tree->SetBranchAddress("eventnumber", &eventnumber);
-
-  TH2D spectre_ampl_backtoback("spectre_amp_backtobackl","spectre_ampl_backtoback", 520, 0, 520, 1000, 0, 20000);
-  TH2D spectre_charge_backtoback("spectre_charge_backtoback","spectre_charge_backtoback", 520, 0, 520, 1000, 0, 60000);
-
-  TFile *newfile = new TFile("test_back.root", "RECREATE");
-
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("eventnumber", &eventnumber);
-  Result_tree.Branch("calo_hit", &calo_hit);
-  Result_tree.Branch("tracker_hit_side", &tracker_hit_side);
-  Result_tree.Branch("tracker_hit_layer", &tracker_hit_layer);
-  Result_tree.Branch("tracker_hit_column", &tracker_hit_column);
-
-  std::vector<int> *event_vec = new std::vector<int>;
-
-  double prev_calo_hit = -1;
-  int prev_eventnumber = -1;
-
-  for (int i = 0; i < 200; i++) {
-    tree->GetEntry(i);
-    if (prev_calo_hit != calo_hit && prev_eventnumber == eventnumber) {
-      event_vec->push_back(eventnumber);
-      // cout << "ok" << endl;
-    }
-    // cout << "om = " << calo_hit << " and prev = " << prev_calo_hit << "  <<   ev n = " << eventnumber  << " and prev = " << prev_eventnumber << endl;
-    prev_calo_hit = calo_hit;
-    prev_eventnumber = eventnumber;
-  }
-  // return;
-  int j = 0;
-  int compteur = 0;
-  for (int i = 0; i < 200; i++) {
-    tree->GetEntry(i);
-
-    cout <<"ev n = " << eventnumber  << " and prev = " << event_vec->at(j) << endl;
-    if (eventnumber == event_vec->at(j)) {
-      compteur = 1;
-      Result_tree.Fill();
-    }
-    else if(compteur == 1) {
-      j++;
-      i-=1;
-    }
-    compteur = 0;
-  }
-  newfile->cd();
-  Result_tree.Write();
-  newfile->Close();
-}
 
 int main() {
   track_cutter();
