@@ -1747,67 +1747,64 @@ void sndisplay_demonstrator_test ()
   sndemonstrator->canvas->SaveAs("sndisplay-demonstrator-test.png");
 }
 
-void sndisplay_demonstrator()
+void sndisplay_demonstrator(int event)
 {
   sndisplay::demonstrator *sndemonstrator = new sndisplay::demonstrator ("demonstrator_test");
 
-  TFile *file = new TFile("test.root", "READ");
-  int event;
-  int om_num;
-  int calo_nohits, calo_hit;
+  TFile *file = new TFile("data/snemo_run-902_udd.root", "READ");
+  int eventnumber;
 
-  std::vector<int> *side = new std::vector<int>;
-  std::vector<int> *column = new std::vector<int>;
-  std::vector<int> *layer = new std::vector<int>;
+  std::vector<int> *calo_type = new std::vector<int>;
+  std::vector<int> *calo_side = new std::vector<int>;
+  std::vector<int> *calo_column = new std::vector<int>;
+  std::vector<int> *calo_row = new std::vector<int>;
+  std::vector<int> *tracker_side = new std::vector<int>;
+  std::vector<int> *tracker_column = new std::vector<int>;
+  std::vector<int> *tracker_layer = new std::vector<int>;
 
-  TTree* tree = (TTree*)file->Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("eventnumber",1);
-  tree->SetBranchAddress("eventnumber", &event);
-  tree->SetBranchStatus("om_num",1);
-  tree->SetBranchAddress("om_num", &om_num);
-  tree->SetBranchStatus("tracker_side",1);
-  tree->SetBranchAddress("tracker_side", &side);
-  tree->SetBranchStatus("tracker_layer",1);
-  tree->SetBranchAddress("tracker_layer", &layer);
-  tree->SetBranchStatus("tracker_column",1);
-  tree->SetBranchAddress("tracker_column", &column);
-  tree->SetBranchStatus("calo_nohits",1);
-  tree->SetBranchAddress("calo_nohits", &calo_nohits);
-  tree->SetBranchStatus("calo_hit",1);
-  tree->SetBranchAddress("calo_hit", &calo_hit);
+  TTree* tree = (TTree*)file->Get("SimData");
+  tree->SetBranchStatus("header.eventnumber",1);
+  tree->SetBranchAddress("header.eventnumber", &eventnumber);
+  tree->SetBranchStatus("digicalo.type",1);
+  tree->SetBranchAddress("digicalo.type", &calo_type);
+  tree->SetBranchStatus("digicalo.side",1);
+  tree->SetBranchAddress("digicalo.side", &calo_side);
+  tree->SetBranchStatus("digicalo.column",1);
+  tree->SetBranchAddress("digicalo.column", &calo_column);
+  tree->SetBranchStatus("digicalo.row",1);
+  tree->SetBranchAddress("digicalo.row", &calo_row);
+  tree->SetBranchStatus("digitracker.side",1);
+  tree->SetBranchAddress("digitracker.side", &tracker_side);
+  tree->SetBranchStatus("digitracker.layer",1);
+  tree->SetBranchAddress("digitracker.layer", &tracker_layer);
+  tree->SetBranchStatus("digitracker.column",1);
+  tree->SetBranchAddress("digitracker.column", &tracker_column);
 
-  tree->GetEntry(tree->GetEntries()-1);
-  int event_max = event;
-  tree->GetEntry(0);
-  int i = 0;
-  int prev_event = 0;
-  while (event <= event_max) {
-    tree->GetEntry(i);
+  for (int i = event; i < event + 1; i++) {
 
-    // if (calo_nohits == 1) {
-
-
-      for (int j = 0; j < column->size(); j++) {
-        sndemonstrator->setggcontent(side->at(j), column->at(j), layer->at(j), 1);
-      }
-      sndemonstrator->setomcontent(om_num,  1.0);
-
-    if (event != prev_event && i >= 0) {
-      sndemonstrator->settitle(Form("run 945 // event %d calo_hit %d", prev_event, calo_hit));
-      sndemonstrator->draw_top();
-      sndemonstrator->canvas->SaveAs(Form("events/event_%d_calo_hit_%d.png", prev_event, calo_hit));
-
-      for (int side=0; side<2; ++side)
-        for (int row=0; row<113; ++row)
-          for (int layer=0; layer<9; ++layer)
-      sndemonstrator->setggcontent(side, row, layer, 0);
-      for (int om_num = 0; om_num < 712; om_num++)
+    for (int side=0; side<2; ++side)
+      for (int row=0; row<113; ++row)
+        for (int layer=0; layer<9; ++layer)
+          sndemonstrator->setggcontent(side, row, layer, 0);
+    for (int om_num = 0; om_num < 712; om_num++)
       sndemonstrator->setomcontent(om_num,  0.0);
+    tree->GetEntry(i);
+    std::cout << "event_number = " << eventnumber << '\n';
+
+    for (int j = 0; j < tracker_column->size(); j++) {
+      sndemonstrator->setggcontent(tracker_side->at(j), tracker_column->at(j), tracker_layer->at(j), 1);
+
     }
-        // }
-    prev_event = event;
-    i++;
+    for (int j = 0; j < calo_column->size(); j++) {
+      if (calo_type->at(j) == 0) {
+        sndemonstrator->setomcontent(calo_side->at(j)*260 + calo_column->at(j)*13 + calo_row->at(j),  1.0);
+        std::cout << "om num = " << calo_side->at(j)*260 + calo_column->at(j)*13 + calo_row->at(j) << '\n';
+      }
+    }
+
+    sndemonstrator->settitle(Form("run 902 // event %d", eventnumber));
+    sndemonstrator->draw_top();
+    // sndemonstrator->canvas->SaveAs(Form("events/event_%d_calo_hit_%d.png", prev_event, calo_hit));
   }
   return;
 }
