@@ -49,6 +49,7 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
   vector<long> last_R6;
   vector<long> last_R0;
   vector<double> last_column;
+  vector<int> last_side;
   vector<double> z;
   vector<double> col;
 
@@ -64,6 +65,7 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
         }
         if (track_layer.at(i) == 8) {
           last_column.push_back(track_column.at(i));
+          last_side.push_back(track_side.at(i));
           last_R5.push_back(R5.at(i).at(0));
           last_R6.push_back(R6.at(i).at(0));
           last_R0.push_back(R0.at(i).at(0));
@@ -74,10 +76,10 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
 
   for (int i = 0; i < last_column.size(); i++) {
     for (int j = 0; j < 20; j++) {
-      if (last_column.at(i) >= tab_bas[j] && last_column.at(i) <= tab_haut[j] && compteur_calo[track_side.at(i)][j] > 3){
-        cout << "R0 = " << last_R0.at(i) << "  and R5 = " << last_R5.at(i) << "  and R6 = " << last_R6.at(i) << endl;
+      if (last_column.at(i) >= tab_bas[j] && last_column.at(i) <= tab_haut[j] && compteur_calo[last_side.at(i)][j] > 3){
+        // cout << "R0 = " << last_R0.at(i) << "  and R5 = " << last_R5.at(i) << "  and R6 = " << last_R6.at(i) << endl;
         z.push_back(z_calculator_gg(last_R0.at(i), last_R5.at(i), last_R6.at(i)));
-        cout << "z = " << z.back() << endl;
+        // cout << "z = " << z.back() << endl;
 
         col.push_back(last_column.at(i));
       }
@@ -113,6 +115,7 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
   vector<long> first_R6;
   vector<long> first_R0;
   vector<double> first_column;
+  vector<int> first_side;
   vector<double> z;
   vector<double> col;
 
@@ -123,6 +126,7 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
           if (abs(track_column.at(i) - (8.5 + j * 19)) < 3) {
             compteur_source[track_side.at(i)][j]++;
             if (track_layer.at(i) == 0) {
+              first_side.push_back(track_side.at(i));
               first_column.push_back(track_column.at(i));
               first_R5.push_back(R5.at(i).at(0));
               first_R6.push_back(R6.at(i).at(0));
@@ -135,8 +139,8 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
   }
 
   for (int i = 0; i < first_column.size(); i++) {
-    for (int j = 0; j < 20; j++) {
-      if (first_column.at(i) >= tab_bas[j] && first_column.at(i) <= tab_haut[j] && compteur_calo[track_side.at(i)][j] > 3){
+    for (int j = 0; j < 6; j++) {
+      if (abs(first_column.at(i)- (8.5 + j * 19)) < 3  && compteur_source[first_side.at(i)][j] > 3){
         z.push_back(z_calculator_gg(first_R0.at(i), first_R5.at(i), first_R6.at(i)));
         col.push_back(first_column.at(i));
       }
@@ -249,10 +253,10 @@ void track_cutter() {
 
   int compteur_source[2][6] = {0};
   int compteur_calo[2][20] = {0};
-  double* z_colum_last = new double[2];
-  double* z_colum_first = new double[2];
+  double* z_column_last = new double[2];
+  double* z_column_first = new double[2];
   int om_num, nelec, ngamma;
-  TFile *newfile = new TFile("test.root", "RECREATE");
+  TFile *newfile = new TFile("cutted_bi.root", "RECREATE");
 
   int calo_compteur_nohits = 0;
   double z_last_gg, z_first_gg;
@@ -288,20 +292,20 @@ void track_cutter() {
   Result_tree.Branch("first_column", &first_column);
   Result_tree.Branch("emitting_source", &source);
 
-  // for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
-  for (int i = 25839; i < 25840; i++) {      //loop on event number
+  for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
+  // for (int i = 0; i < 1000; i++) {      //loop on event number
   if (i % 100000 == 0) {
     cout << i << endl;
   }
     tree->GetEntry(i);
-    z_colum_last[0] = 0;
-    z_colum_last[1] = 0;
-    z_colum_first[0] = 0;
-    z_colum_first[1] = 0;
-    cout << "eventnumber = " << eventnumber << endl;
+    z_column_last[0] = 0;
+    z_column_last[1] = 0;
+    z_column_first[0] = 0;
+    z_column_first[1] = 0;
+    // cout << "eventnumber = " << eventnumber << endl;
     int validator = 0;
     for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
-      cout << "calo hit = " << k << endl;
+      // cout << "calo hit = " << k << endl;
       if (calo_type->at(k) == 0) om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
       if (calo_type->at(k) == 1) om_num = 520 + calo_side->at(k)*64 +  calo_wall->at(k)*32 + calo_column->at(k)*16 + calo_row->at(k);
       if (calo_type->at(k) == 2) om_num = 520 + 128 + calo_side->at(k)*32 + calo_wall->at(k)*16 + calo_column->at(k);
@@ -311,21 +315,22 @@ void track_cutter() {
         memset(compteur_source, 0, sizeof(int) * 2 * 6);
         memset(compteur_calo, 0, sizeof(int) * 2 * 20);
 
-        source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, *R5, *R6, timestamp->at(k), z_column_fisrt);
-        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *R0, *R5, *R6, timestamp->at(k), z_colum_last);
+        source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, *R5, *R6, timestamp->at(k), z_column_first);
+        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *R0, *R5, *R6, timestamp->at(k), z_column_last);
 
-        z_last_gg = z_colum_last[0];
-        z_first_gg = z_colum_first[0];
+        z_last_gg = z_column_last[0];
+        z_first_gg = z_column_first[0];
         timed_gg = gg_counter(timestamp->at(k), *R0, tracker_nohits);
         calo_compteur_nohits++;
         if (timed_gg > 5 && timed_gg < 16 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12){
           if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && z_last_gg <= 0.0926 + 0.1852*((om_num%13)-6)  && z_last_gg >= -0.093 + 0.1852*((om_num%13)-6)) {       //// Delta z moyen = 0.268589cm, soit 0.1852 de -1 à 1
+            // cout << "side =" << calo_side->at(k) << endl;
             vec_z_last_gg.push_back(z_last_gg);
             vec_z_first_gg.push_back(z_first_gg);
             // cout << "z = " << z_last_gg << endl;
             vec_nelec.push_back(1);
-            last_column.push_back(z_colum_last[1]);
-            first_column.push_back(z_colum_first[1]);
+            last_column.push_back(z_column_last[1]);
+            first_column.push_back(z_column_first[1]);
             e_event.push_back(1);
             associated_track.push_back(timed_gg);
             validator = 1;
