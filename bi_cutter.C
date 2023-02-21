@@ -40,7 +40,7 @@ double z_calculator_gg(double R0, double R5, double R6){
   double t_top = (R6 - R0)*12.5E-3;                                 // Put it in µs
   double t_bottom = (R5 - R0)*12.5E-3;
 
-
+  // cout << "tb =" << t_bottom << " and tt = " << t_top << endl;
   if (t_bottom > 0 && t_bottom < 1.1E+17 && t_top > 0 && t_top < 1.1E+17) z_gg = ((t_bottom - t_top)/(t_top + t_bottom));
   else z_gg = -9999;
   return z_gg;
@@ -52,13 +52,11 @@ int row_to_source(int column){
 
   for (int i = 0; i < 5; i++) {
     if (column > colonne_gauche[i] && column < colonne_droite[i]) {
-      return i+1;
+      return i;
     }
   }
   return 10000;
 }
-
-
 
 void first_z_selectionner() {
 
@@ -85,15 +83,17 @@ void first_z_selectionner() {
 }
 
 int source_numberer(double z, int column){
-  // cout << "z = " << z << " and column = " << column << endl;
-  int source_number;
+  // if (z < -0.5 && z > -1) cout << "z = " << z << " and column = " << column << endl;
+  int source_number = -10;
+  if (column > -1 && column < 6) {
   for(int j = 1; j < 6; j++){ // loop on the source row
-    // cout << " j = " << j << " and min z = " << source_column_row_mean[column][j] - 3*source_column_row_sigma[column][j] << " and max z = " << source_column_row_mean[column][j] + 3*source_column_row_sigma[column][j] << endl;
-    if (z > source_column_row_mean[column][j] - 3*source_column_row_sigma[column][j] && z < source_column_row_mean[column][j] + 3*source_column_row_sigma[column][j]) {
-      source_number = column*100 + j;
-      return source_number;
+      // if (z < -0.5 && z > -1)cout << " j = " << j << " and min z = " << source_column_row_mean[column][j] - 3*source_column_row_sigma[column][j] << " and max z = " << source_column_row_mean[column][j] + 3*source_column_row_sigma[column][j] << endl;
+      if (z > source_column_row_mean[column][j] - 3*source_column_row_sigma[column][j] && z < source_column_row_mean[column][j] + 3*source_column_row_sigma[column][j]) {
+        source_number = column*100 + j;
+        return source_number;
+      }
+      else source_number = -9999;
     }
-    else source_number = -9999;
   }
   return source_number;
 }
@@ -138,9 +138,7 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
 
   z_column[0] = -1000;
   z_column[1] = -1000;
-  z_column[2] = -1000;
 
-  int source_number;
   double column;
   double z_gg;
   if (z.size() > 0) {
@@ -149,30 +147,12 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
         z_gg += z.at(i);
         column += col.at(i);
       }
-      int row = row_to_source(column);
-      if (row < 10) {
-        source_number = source_numberer(z_gg, row);
-        if (source_number >= 0) {
-          z_column[0] = z_gg / z.size();
-          z_column[1] = column / z.size();
-          z_column[2] = source_number;
-        }
-      }
+      z_column[0] = z_gg / z.size();
+      z_column[1] = column / z.size();
     }
     else{
-
-      int row = row_to_source(col.at(0));
-      if (row < 10) {
-        // cout << "z = " << z.at(0) << " and row = " << row << endl;
-        source_number = source_numberer(z.at(0), row);
-        // cout << " source number " << source_number << endl;
-
-        if (source_number >= 0) {
           z_column[0] = z.at(0);
           z_column[1] = col.at(0);
-          z_column[2] = source_number;
-        }
-      }
     }
   }
 }
@@ -326,7 +306,7 @@ void track_cutter() {
   int compteur_source[2][6] = {0};
   int compteur_calo[2][20] = {0};
   double* z_column_last = new double[2];
-  double* z_column_first = new double[3];
+  double* z_column_first = new double[2];
   int om_num, nelec, ngamma;
   TFile *newfile = new TFile("cutted_bi.root", "RECREATE");
 
@@ -365,20 +345,18 @@ void track_cutter() {
   Result_tree.Branch("source_number", &source);
 
   for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
-  // for (int i = 0; i < 100; i++) {      //loop on event number
+  // for (int i = 286727; i < 286728; i++) {      //loop on event number
+
   if (i % 100000 == 0) {
-    cout << i << endl;
+    cout << 100.*i/tree->GetEntries() << "%" << endl;
   }
     tree->GetEntry(i);
     z_column_last[0] = 0;
     z_column_last[1] = 0;
     z_column_first[0] = 0;
     z_column_first[1] = 0;
-    z_column_first[2] = 0;
-    // cout << "eventnumber = " << eventnumber << endl;
     int validator = 0;
     for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
-      // cout << "calo hit = " << k << endl;
       if (calo_type->at(k) == 0) om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
       if (calo_type->at(k) == 1) om_num = 520 + calo_side->at(k)*64 +  calo_wall->at(k)*32 + calo_column->at(k)*16 + calo_row->at(k);
       if (calo_type->at(k) == 2) om_num = 520 + 128 + calo_side->at(k)*32 + calo_wall->at(k)*16 + calo_column->at(k);
@@ -395,31 +373,40 @@ void track_cutter() {
         z_first_gg = z_column_first[0];
         timed_gg = gg_counter(timestamp->at(k), *R0, tracker_nohits);
         calo_compteur_nohits++;
-
+        int first_gg_row = row_to_source(z_column_first[1]);
+        int source_number = source_numberer(z_column_first[0], first_gg_row);
+        // if (z_column_first[0] < 1 && z_column_first[0] > -1) cout << "z = " << z_column_first[0] << " and row  = "<< z_column_first[1] << " and row = " << first_gg_row << endl;
+        // if (z_column_first[0] < 1 && z_column_first[0] > -1) cout << "-> source : " << source_number << endl;
+        // cout << "calo_hit = " << om_num << endl;
+        // cout << "calo source track = " << calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) << endl;
+        // cout << "zlastgg = " << z_last_gg << endl;
+        // cout << "" << endl;
         if (timed_gg > 5 && timed_gg < 16 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12){
-          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && z_last_gg <= 0.0926 + 0.1852*((om_num%13)-6)  && z_last_gg >= -0.093 + 0.1852*((om_num%13)-6)){//} && z_column_first[2] >= 0)) {       //// Delta z moyen = 0.268589cm, soit 0.1852 de -1 à 1 de moyenneur gategauss
+          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && z_last_gg <= 0.1 + 0.2*((om_num%13)-6)  && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
             // cout << "side =" << calo_side->at(k) << endl;
             vec_z_last_gg.push_back(z_last_gg);
             vec_z_first_gg.push_back(z_first_gg);
-            cout << "first col = " << z_column_first[1] << endl;
+            // cout << "first col = " << z_column_first[1] << endl;
             vec_nelec.push_back(1);
             last_column.push_back(z_column_last[1]);
             first_column.push_back(z_column_first[1]);
             e_event.push_back(1);
             associated_track.push_back(timed_gg);
-            source.push_back(z_column_first[2]);
+            source.push_back(source_number);
             validator = 1;
           }
           else {
             vec_ngamma.push_back(1);
             e_event.push_back(0);
             associated_track.push_back(0);
+            source.push_back(-9999);
           }
         }
         else {
           vec_ngamma.push_back(1);
           e_event.push_back(0);
           associated_track.push_back(0);
+          source.push_back(-9999);
         }
         om_number.push_back(om_num);
         charge.push_back(-calo_charge->at(k));
