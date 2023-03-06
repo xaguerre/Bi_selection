@@ -157,7 +157,7 @@ void source_track_selectionner(vector<int> track_side, vector<int> track_layer, 
   }
 }
 
-void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, vector<int> track_column, int compteur_calo[][20], vector<vector<long>> R0, vector<vector<long>> R5, vector<vector<long>> R6, double timestamp, double *z_column){        /// comparison between the calo column and the tracker layer
+void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, vector<int> track_column, int compteur_calo[][20], vector<vector<long>> R0, vector<vector<long>> R5, vector<vector<long>> R6, double timestamp, double *z_column, int *flag6){        /// comparison between the calo column and the tracker layer
   vector<long> last_R5;
   vector<long> last_R6;
   vector<long> last_R0;
@@ -177,16 +177,19 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
           if (track_column.at(i) >= tab_bas[j] && track_column.at(i) <= tab_haut[j]) compteur_calo[track_side.at(i)][j]++;
         }
         if (track_layer.at(i) == 8) {
+          *flag6 = 1;
           last_column.push_back(track_column.at(i));
           last_side.push_back(track_side.at(i));
           last_R5.push_back(R5.at(i).at(0));
           last_R6.push_back(R6.at(i).at(0));
           last_R0.push_back(R0.at(i).at(0));
+
         }
       }
     }
   }
 
+  if (*flag6 == 9) *flag6 = 0;
   for (int i = 0; i < last_column.size(); i++) {
     for (int j = 0; j < 20; j++) {
       if (last_column.at(i) >= tab_bas[j] && last_column.at(i) <= tab_haut[j] && compteur_calo[last_side.at(i)][j] > 3){
@@ -222,11 +225,19 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
   }
 }
 
-int calo_source_track(int compteur_source[][6], int compteur_calo[][20], int calo_column, int calo_side){        /// source localiser
-  if (compteur_calo[calo_side][calo_column] < 3) return 0;
-  for (int i = 0; i < 20; i++) {
-    if (compteur_source[calo_side][i] > 3) return 1;
+int calo_source_track(int compteur_source[][6], int compteur_calo[][20], int calo_column, int calo_side, int* flag4, int *flag5){        /// source localiser
+  if (compteur_calo[calo_side][calo_column] >= 3) *flag4 = 1;
+  else *flag4 = 0;
+  if (compteur_calo[calo_side][calo_column] >= 3) {
+    for (int i = 0; i < 20; i++) {
+      if (compteur_source[calo_side][i] >= 3){
+        *flag5 = 1;
+        return 1;
+      }
+      else *flag5 = 0;
+    }
   }
+  else *flag5 = 0;
   return 0;
 }
 
@@ -303,13 +314,22 @@ void track_cutter() {
   tree->SetBranchStatus("digitracker.topcathodetimestamp",1);
   tree->SetBranchAddress("digitracker.topcathodetimestamp", &R6);
 
+  std::vector<int> flag;
+  std::vector<int> flag0;
+  std::vector<int> flag1;
+  std::vector<int> flag2;
+  std::vector<int> flag3;
+  std::vector<int> flag4;
+  std::vector<int> flag5;
+  std::vector<int> flag6;
+  std::vector<int> flag7;
+
   int compteur_source[2][6] = {0};
   int compteur_calo[2][20] = {0};
   double* z_column_last = new double[2];
   double* z_column_first = new double[2];
   int om_num, nelec, ngamma;
-  TFile *newfile = new TFile("cutted_bi.root", "RECREATE");
-
+  TFile *newfile = new TFile("cut_bi.root", "RECREATE");
   int calo_compteur_nohits = 0;
   double z_last_gg, z_first_gg;
   std::vector<int> om_number;
@@ -343,9 +363,18 @@ void track_cutter() {
   Result_tree.Branch("z_first_gg", &vec_z_first_gg);
   Result_tree.Branch("first_column", &first_column);
   Result_tree.Branch("source_number", &source);
+  Result_tree.Branch("flag", &flag);
+  Result_tree.Branch("flag_e_event", &flag0);
+  Result_tree.Branch("flag_charge", &flag1);
+  Result_tree.Branch("flag_associated_nohit", &flag2);
+  Result_tree.Branch("flag_MW", &flag3);
+  Result_tree.Branch("flag_calo_square", &flag4);
+  Result_tree.Branch("flag_source_square", &flag5);
+  Result_tree.Branch("flag_last_column", &flag6);
+  Result_tree.Branch("flag_last_z", &flag7);
 
   for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
-  // for (int i = 286727; i < 286728; i++) {      //loop on event number
+  // for (int i = 0; i < 31; i++) {      //loop on event number
 
   if (i % 100000 == 0) {
     cout << 100.*i/tree->GetEntries() << "%" << endl;
@@ -357,18 +386,38 @@ void track_cutter() {
     z_column_first[1] = 0;
     int validator = 0;
     for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
+      int flag4_int = 0;
+      int flag5_int = 0;
+      int flag6_int = 0;
+      flag0.push_back(9);
+      flag1.push_back(9);
+      flag2.push_back(9);
+      flag3.push_back(9);
+      flag4.push_back(9);
+      flag5.push_back(9);
+      flag6.push_back(9);
+      flag7.push_back(9);
       if (calo_type->at(k) == 0) om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
       if (calo_type->at(k) == 1) om_num = 520 + calo_side->at(k)*64 +  calo_wall->at(k)*32 + calo_column->at(k)*16 + calo_row->at(k);
       if (calo_type->at(k) == 2) om_num = 520 + 128 + calo_side->at(k)*32 + calo_wall->at(k)*16 + calo_column->at(k);
+      om_number.push_back(om_num);
+      charge.push_back(-calo_charge->at(k));
+      amplitude.push_back(-calo_ampl->at(k));
+      calo_tdc.push_back(timestamp->at(k));
+
 
       if (-calo_ampl->at(k) > 200) {      // condition to cut small charge and keep only MW OM
+        flag1.pop_back();
+        flag1.push_back(1);
         int timed_gg;
         memset(compteur_source, 0, sizeof(int) * 2 * 6);
         memset(compteur_calo, 0, sizeof(int) * 2 * 20);
 
         source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, *R5, *R6, timestamp->at(k), z_column_first);
-        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *R0, *R5, *R6, timestamp->at(k), z_column_last);
+        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *R0, *R5, *R6, timestamp->at(k), z_column_last, &flag6_int);
 
+        flag6.pop_back();
+        flag6.push_back(flag6_int);
         z_last_gg = z_column_last[0];
         z_first_gg = z_column_first[0];
         timed_gg = gg_counter(timestamp->at(k), *R0, tracker_nohits);
@@ -381,9 +430,33 @@ void track_cutter() {
         // cout << "calo source track = " << calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) << endl;
         // cout << "zlastgg = " << z_last_gg << endl;
         // cout << "" << endl;
+        if (timed_gg > 5 && timed_gg < 16) {
+          flag2.pop_back();
+          flag2.push_back(1);
+        }
+        else if (flag2.at(k) == 9) {
+          flag2.pop_back();
+          flag2.push_back(0);
+        }
+        if (om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12) {
+          flag3.pop_back();
+          flag3.push_back(1);
+        }
+        else if (flag3.at(k) == 9) {
+          flag3.pop_back();
+          flag3.push_back(0);
+        }
+
         if (timed_gg > 5 && timed_gg < 16 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12){
-          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) == 1 && z_last_gg <= 0.1 + 0.2*((om_num%13)-6)  && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
-            // cout << "side =" << calo_side->at(k) << endl;
+          if (z_last_gg <= 0.1 + 0.2*((om_num%13)-6)  && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)) {
+            flag7.pop_back();
+            flag7.push_back(1);
+          }
+          else if (flag7.at(k) == 9) {
+            flag7.pop_back();
+            flag7.push_back(0);
+          }
+          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k), &flag4_int, &flag5_int) == 1 && z_last_gg <= 0.1 + 0.2*((om_num%13)-6) && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
             vec_z_last_gg.push_back(z_last_gg);
             vec_z_first_gg.push_back(z_first_gg);
             // cout << "first col = " << z_column_first[1] << endl;
@@ -393,37 +466,57 @@ void track_cutter() {
             e_event.push_back(1);
             associated_track.push_back(timed_gg);
             source.push_back(source_number);
-            validator = 1;
+
+            flag0.pop_back();
+            flag0.push_back(1);
           }
-          else {
+          else {;
             vec_ngamma.push_back(1);
             e_event.push_back(0);
             associated_track.push_back(0);
             source.push_back(-9999);
+            flag0.pop_back();
+            flag0.push_back(1);
           }
+          flag4.pop_back();
+          flag4.push_back(flag4_int);
+          flag5.pop_back();
+          flag5.push_back(flag5_int);
         }
         else {
           vec_ngamma.push_back(1);
           e_event.push_back(0);
           associated_track.push_back(0);
           source.push_back(-9999);
+          flag0.pop_back();
+          flag0.push_back(1);
         }
-        om_number.push_back(om_num);
-        charge.push_back(-calo_charge->at(k));
-        amplitude.push_back(-calo_ampl->at(k));
-        calo_tdc.push_back(timestamp->at(k));
+
 
         // source.push_back
       }
+      else {
+        flag1.pop_back();
+        flag1.push_back(0);
+      }
+      flag.push_back(flag0.at(k) +flag1.at(k)*10 +flag2.at(k)*100 + flag3.at(k)*1000 + flag4.at(k)*10000 + flag5.at(k)*100000 + flag6.at(k)*1000000 + flag7.at(k)*10000000);
     }
     nelec = 0;
     ngamma = 0;
-    if (validator == 1) {
-      for (int j = 0; j < vec_nelec.size(); j++) {nelec+=vec_nelec.at(j);}
-      for (int l = 0; l < vec_ngamma.size(); l++) {ngamma+=vec_ngamma.at(l);}
-      Result_tree.Fill();
-      // event++;
-    }
+
+    for (int j = 0; j < vec_nelec.size(); j++) {nelec+=vec_nelec.at(j);}
+    for (int l = 0; l < vec_ngamma.size(); l++) {ngamma+=vec_ngamma.at(l);}
+
+    Result_tree.Fill();
+    flag0.clear();
+    flag1.clear();
+    flag2.clear();
+    flag3.clear();
+    flag4.clear();
+    flag5.clear();
+    flag6.clear();
+    flag7.clear();
+    flag.clear();
     validator = 0;
     vec_nelec.clear();
     vec_ngamma.clear();

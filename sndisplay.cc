@@ -1779,6 +1779,14 @@ void sndisplay_demonstrator(int event)
   tree->SetBranchAddress("digitracker.layer", &tracker_layer);
   tree->SetBranchStatus("digitracker.column",1);
   tree->SetBranchAddress("digitracker.column", &tracker_column);
+  tree->SetBranchStatus("digitracker.anodetimestampR0",1);
+  tree->SetBranchAddress("digitracker.anodetimestampR0", &R0);
+  tree->SetBranchStatus("digitracker.bottomcathodetimestamp",1);
+  tree->SetBranchAddress("digitracker.bottomcathodetimestamp", &R5);
+  tree->SetBranchStatus("digitracker.topcathodetimestamp",1);
+  tree->SetBranchAddress("digitracker.topcathodetimestamp", &R6);
+
+
 
   for (int i = event; i < event + 1; i++) {
 
