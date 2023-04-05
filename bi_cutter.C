@@ -254,7 +254,7 @@ int gg_counter(double timestamp, vector<vector<long>> R0, int ngg){
 void track_cutter() {
   first_z_selectionner();
   // return;
-  TFile *file = new TFile("data/snemo_run-902_udd.root", "READ");
+  TFile *file = new TFile("data/snemo_run-974_udd.root", "READ");
   std::vector<vector<short>> *wave = new std::vector<vector<short>>;
   std::vector<vector<long>> *R0 = new std::vector<vector<long>>;
   std::vector<vector<long>> *R5 = new std::vector<vector<long>>;
@@ -329,7 +329,8 @@ void track_cutter() {
   double* z_column_last = new double[2];
   double* z_column_first = new double[2];
   int om_num, nelec, ngamma;
-  TFile *newfile = new TFile("cut_bi.root", "RECREATE");
+
+  TFile *newfile = new TFile("cut_974.root", "RECREATE");
   int calo_compteur_nohits = 0;
   double z_last_gg, z_first_gg;
   std::vector<int> om_number;
@@ -340,7 +341,6 @@ void track_cutter() {
   std::vector<int> source;
   std::vector<int> vec_nelec;
   std::vector<int> vec_ngamma;
-  std::vector<int> e_event;
   std::vector<double> vec_z_last_gg;
   std::vector<double> last_column;
   std::vector<double> vec_z_first_gg;
@@ -352,7 +352,6 @@ void track_cutter() {
   Result_tree.Branch("ngg_tot", &tracker_nohits);
   Result_tree.Branch("nelec", &nelec);
   Result_tree.Branch("ngamma", &ngamma);
-  Result_tree.Branch("e_event", &e_event);
   Result_tree.Branch("om_number", &om_number);
   Result_tree.Branch("charge", &charge);
   Result_tree.Branch("amplitude", &amplitude);
@@ -374,7 +373,7 @@ void track_cutter() {
   Result_tree.Branch("flag_last_z", &flag7);
 
   for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
-  // for (int i = 0; i < 31; i++) {      //loop on event number
+  // for (int i = 0; i < 3000; i++) {      //loop on event number
 
   if (i % 100000 == 0) {
     cout << 100.*i/tree->GetEntries() << "%" << endl;
@@ -448,7 +447,7 @@ void track_cutter() {
         }
 
         if (timed_gg > 5 && timed_gg < 16 && om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12){
-          if (z_last_gg <= 0.1 + 0.2*((om_num%13)-6)  && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)) {
+          if (z_last_gg <= 0.1 + 0.2*((om_num%13)-6)  && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)){
             flag7.pop_back();
             flag7.push_back(1);
           }
@@ -456,27 +455,35 @@ void track_cutter() {
             flag7.pop_back();
             flag7.push_back(0);
           }
-          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k), &flag4_int, &flag5_int) == 1 && z_last_gg <= 0.1 + 0.2*((om_num%13)-6) && z_last_gg >= -0.1 + 0.2*((om_num%13)-6)){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
+
+          double calo_row2z = -15;
+          double z_last_gg_min = -15;
+          double z_last_gg_max = -15;
+
+          if (calo_type->at(k) == 0){
+            calo_row2z = -1.1165 +0.18714*calo_row->at(k);
+            z_last_gg_min = calo_row2z - 0.1;
+            z_last_gg_max = calo_row2z + 0.1;
+          }
+          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k), &flag4_int, &flag5_int) == 1 && z_last_gg <= z_last_gg_max && z_last_gg >= z_last_gg_min){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
             vec_z_last_gg.push_back(z_last_gg);
             vec_z_first_gg.push_back(z_first_gg);
             // cout << "first col = " << z_column_first[1] << endl;
             vec_nelec.push_back(1);
             last_column.push_back(z_column_last[1]);
             first_column.push_back(z_column_first[1]);
-            e_event.push_back(1);
             associated_track.push_back(timed_gg);
             source.push_back(source_number);
 
             flag0.pop_back();
             flag0.push_back(1);
           }
-          else {;
+          else {
             vec_ngamma.push_back(1);
-            e_event.push_back(0);
             associated_track.push_back(0);
             source.push_back(-9999);
             flag0.pop_back();
-            flag0.push_back(1);
+            flag0.push_back(0);
           }
           flag4.pop_back();
           flag4.push_back(flag4_int);
@@ -485,11 +492,10 @@ void track_cutter() {
         }
         else {
           vec_ngamma.push_back(1);
-          e_event.push_back(0);
           associated_track.push_back(0);
           source.push_back(-9999);
           flag0.pop_back();
-          flag0.push_back(1);
+          flag0.push_back(0);
         }
 
 
@@ -526,7 +532,6 @@ void track_cutter() {
     calo_tdc.clear();
     associated_track.clear();
     source.clear();
-    e_event.clear();
     last_column.clear();
     vec_z_last_gg.clear();
     first_column.clear();
@@ -541,82 +546,230 @@ void track_cutter() {
   cout << "OK" << endl;
 }
 
-int main() {
-  track_cutter();
-  return 0;
+void tri() {
+  gStyle->SetOptFit(1);
+  gStyle->SetOptStat(1);
+
+
+  TFile *file = new TFile("data/snemo_run-974_udd.root", "READ");
+  std::vector<vector<long>> *R0 = new std::vector<vector<long>>;
+  std::vector<vector<long>> *R5 = new std::vector<vector<long>>;
+  std::vector<vector<long>> *R6 = new std::vector<vector<long>>;
+  std::vector<long> *timestamp = new std::vector<long>;
+  std::vector<int> *calo_type = new std::vector<int>;
+  std::vector<int> *calo_side = new std::vector<int>;
+  std::vector<int> *calo_wall = new std::vector<int>;
+  std::vector<int> *calo_column = new std::vector<int>;
+  std::vector<int> *calo_row = new std::vector<int>;
+  std::vector<int> *calo_charge = new std::vector<int>;
+  std::vector<int> *calo_ampl = new std::vector<int>;
+  std::vector<int> *tracker_side = new std::vector<int>;
+  std::vector<int> *tracker_column = new std::vector<int>;
+  std::vector<int> *tracker_layer = new std::vector<int>;
+  std::vector<int> *cut_track_side = new std::vector<int>;
+  std::vector<int> *cut_track_layer = new std::vector<int>;
+  std::vector<long> *R0_new = new std::vector<long>;
+  std::vector<long> *R5_new = new std::vector<long>;
+  std::vector<long> *R6_new = new std::vector<long>;
+  std::vector<int> *cell_number = new std::vector<int>;
+
+
+  int eventnumber, calo_nohits, tracker_nohits;
+
+  TTree* tree = (TTree*)file->Get("SimData");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("header.eventnumber",1);
+  tree->SetBranchAddress("header.eventnumber", &eventnumber);
+  tree->SetBranchStatus("digicalo.nohits",1);
+  tree->SetBranchAddress("digicalo.nohits", &calo_nohits);
+  tree->SetBranchStatus("digicalo.timestamp",1);
+  tree->SetBranchAddress("digicalo.timestamp", &timestamp);
+  tree->SetBranchStatus("digicalo.type",1);
+  tree->SetBranchAddress("digicalo.type", &calo_type);
+  tree->SetBranchStatus("digicalo.side",1);
+  tree->SetBranchAddress("digicalo.side", &calo_side);
+  tree->SetBranchStatus("digicalo.wall",1);
+  tree->SetBranchAddress("digicalo.wall", &calo_wall);
+  tree->SetBranchStatus("digicalo.column",1);
+  tree->SetBranchAddress("digicalo.column", &calo_column);
+  tree->SetBranchStatus("digicalo.row",1);
+  tree->SetBranchAddress("digicalo.row", &calo_row);
+  tree->SetBranchStatus("digicalo.charge",1);
+  tree->SetBranchAddress("digicalo.charge", &calo_charge);
+  tree->SetBranchStatus("digicalo.peakamplitude",1);
+  tree->SetBranchAddress("digicalo.peakamplitude", &calo_ampl);
+  tree->SetBranchStatus("digitracker.nohits",1);
+  tree->SetBranchAddress("digitracker.nohits", &tracker_nohits);
+  tree->SetBranchStatus("digitracker.side",1);
+  tree->SetBranchAddress("digitracker.side", &tracker_side);
+  tree->SetBranchStatus("digitracker.layer",1);
+  tree->SetBranchAddress("digitracker.layer", &tracker_layer);
+  tree->SetBranchStatus("digitracker.column",1);
+  tree->SetBranchAddress("digitracker.column", &tracker_column);
+  tree->SetBranchStatus("digitracker.anodetimestampR0",1);
+  tree->SetBranchAddress("digitracker.anodetimestampR0", &R0);
+  tree->SetBranchStatus("digitracker.bottomcathodetimestamp",1);
+  tree->SetBranchAddress("digitracker.bottomcathodetimestamp", &R5);
+  tree->SetBranchStatus("digitracker.topcathodetimestamp",1);
+  tree->SetBranchAddress("digitracker.topcathodetimestamp", &R6);
+
+
+  TFile *newfile = new TFile("data/test_timestamp.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("eventnumber", &eventnumber);
+  Result_tree.Branch("tracker_side", &tracker_side);
+  Result_tree.Branch("tracker_layer", &tracker_layer);
+  Result_tree.Branch("tracker_column", &tracker_column);
+  Result_tree.Branch("R0", &R0_new);
+  Result_tree.Branch("R5", &R5_new);
+  Result_tree.Branch("R6", &R6_new);
+  Result_tree.Branch("cell_number", &cell_number);
+
+  double om_520 [520];
+  TH2D* om = new TH2D("om", "om", 520, 0, 520, 1000, 0, 50000);
+  TH2D* R0_map = new TH2D("R0_map", "R0_map", 113, 0, 112, 19, 0, 18);
+  TH2D* R0R5_map = new TH2D("R0R5_map", "R0R5_map", 113, 0, 112, 19, 0, 18);
+  TH2D* R0R6_map = new TH2D("R0R6_map", "R0R6_map", 113, 0, 112, 19, 0, 18);
+
+  for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
+  // for (int i = 0; i < 3000; i++) {      //loop on event number
+
+    if (i % 100000 == 0) {
+      cout << 100.*i/tree->GetEntries() << "%" << endl;
+    }
+    tree->GetEntry(i);
+    // for (int j = 0; j < calo_charge->size(); j++) {
+    //   if (calo_type == 0) {
+    //     om_520[calo_side->at(j)*260 + calo_column->at(j)*13 + calo_row->at(j)] ++;
+    //   }
+    // }
+
+    for (int j = 0; j < calo_charge->size(); j++) {
+      for (int k = 0; k < tracker_side->size(); k++) {
+        if (calo_charge->at(j) > 200) {
+          if (R0->at(k).at(0) > 0 ) {
+            if ((2*R0->at(k).at(0) - timestamp->at(j))*6.25e-9 > (-0.2e-6) && (2*R0->at(k).at(0) - timestamp->at(j))*6.25e-9 < (5e-6)){
+              R0_new->push_back(R0->at(k).at(0));
+              R5_new->push_back(R5->at(k).at(0));
+              R6_new->push_back(R6->at(k).at(0));
+              cell_number->push_back(tracker_side->at(k)*1017 +9*tracker_column->at(k)+tracker_layer->at(k));
+              R0_map->Fill(tracker_column->at(k), tracker_side->at(k)*10 + tracker_layer->at(k));
+              if (R5->at(k).at(0) > 0) {
+                R0R5_map->Fill(tracker_column->at(k), tracker_side->at(k)*10 + tracker_layer->at(k));
+              }
+              if (R6->at(k).at(0) > 0) {
+                R0R6_map->Fill(tracker_column->at(k), tracker_side->at(k)*10 + tracker_layer->at(k));
+              }
+            }
+          }
+          Result_tree.Fill();
+          R0_new->clear();
+          R5_new->clear();
+          R6_new->clear();
+          cell_number->clear();
+
+        }
+      }
+
+    }
+  }
+
+
+  // for (int i = 0; i < 520; i++) {
+  //   cout << "spectre om " << i << " -> entry = " << om_520[i] << endl;
+  // }
+
+
+  newfile->cd();
+  Result_tree.Write();
+  om->Write();
+  R0_map->Write();
+  R0R5_map->Write();
+  R0R6_map->Write();
+  newfile->Close();
+}
+//
+void R_calculator() {
+
+TFile *file = new TFile("data/test_timestamp.root", "READ");
+
+  std::vector<int> *tracker_side = new std::vector<int>;
+  std::vector<int> *tracker_column = new std::vector<int>;
+  std::vector<int> *tracker_layer = new std::vector<int>;
+  std::vector<long> *R0 = new std::vector<long>;
+  std::vector<long> *R5 = new std::vector<long>;
+  std::vector<long> *R6 = new std::vector<long>;
+  std::vector<int> *cell_number = new std::vector<int>;
+
+  double R0_new, R5_new, R6_new;
+  int cell;
+
+  int eventnumber, calo_nohits, tracker_nohits;
+
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("eventnumber",1);
+  tree->SetBranchAddress("eventnumber", &eventnumber);
+  tree->SetBranchStatus("tracker_side",1);
+  tree->SetBranchAddress("tracker_side", &tracker_side);
+  tree->SetBranchStatus("tracker_layer",1);
+  tree->SetBranchAddress("tracker_layer", &tracker_layer);
+  tree->SetBranchStatus("tracker_column",1);
+  tree->SetBranchAddress("tracker_column", &tracker_column);
+  tree->SetBranchStatus("R0",1);
+  tree->SetBranchAddress("R0", &R0);
+  tree->SetBranchStatus("R5",1);
+  tree->SetBranchAddress("R5", &R5);
+  tree->SetBranchStatus("R6",1);
+  tree->SetBranchAddress("R6", &R6);
+  tree->SetBranchStatus("cell_number",1);
+  tree->SetBranchAddress("cell_number", &cell_number);
+
+  TFile *newfile = new TFile("tried_R.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("R0", &R0_new);
+  Result_tree.Branch("R5", &R5_new);
+  Result_tree.Branch("R6", &R6_new);
+  Result_tree.Branch("cell_number", &cell);
+
+  double R0_tab[2034];
+  double R5_tab[2034];
+  double R6_tab[2034];
+
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (i % 100000 == 0) {
+      cout << 100.*i/tree->GetEntries() << "%" << endl;
+    }
+    for (int j = 0; j < R0->size(); j++) {
+      R0_tab[cell_number->at(j)] ++;
+      if (R5->at(j) > 0) {
+        R5_tab[cell_number->at(j)] ++;
+      }
+      if (R6->at(j) > 0) {
+        R6_tab[cell_number->at(j)] ++;
+      }
+    }
+  }
+
+  for (int i = 0; i < 2034; i++) {
+    R0_new = R0_tab[i];
+    R5_new = R5_tab[i];
+    R6_new = R6_tab[i];
+    cell = i;
+    Result_tree.Fill();
+  }
+
+  newfile->cd();
+  Result_tree.Write();
+  newfile->Close();
+
 }
 
-// void backtoback() {
-//   TFile *file = new TFile("test.root", "READ");
-//   double charge;
-//   int eventnumber, om_number, calo_nohits;
-//   vector<int> tracker_side;
-//   vector<int> tracker_layer;
-//   vector<int> tracker_column;
-//
-//   TTree* tree = (TTree*)file->Get("Result_tree");
-//   tree->SetBranchStatus("*",0);
-//   tree->SetBranchStatus("om_number",1);
-//   tree->SetBranchAddress("om_number", &om_number);
-//   tree->SetBranchStatus("calo_nohits",1);
-//   tree->SetBranchAddress("calo_nohits", &calo_nohits);
-//   tree->SetBranchStatus("charge",1);
-//   tree->SetBranchAddress("charge", &charge);
-//   tree->SetBranchStatus("tracker_side",1);
-//   tree->SetBranchAddress("tracker_side", &tracker_side);
-//   tree->SetBranchStatus("tracker_side",1);
-//   tree->SetBranchAddress("tracker_side", &tracker_side);
-//   tree->SetBranchStatus("tracker_column",1);
-//   tree->SetBranchAddress("tracker_column", &tracker_column);
-//   tree->SetBranchStatus("eventnumber",1);
-//   tree->SetBranchAddress("eventnumber", &eventnumber);
-//
-//   TH2D spectre_ampl_backtoback("spectre_amp_backtobackl","spectre_ampl_backtoback", 520, 0, 520, 1000, 0, 20000);
-//   TH2D spectre_charge_backtoback("spectre_charge_backtoback","spectre_charge_backtoback", 520, 0, 520, 1000, 0, 60000);
-//
-//   TFile *newfile = new TFile("test_back.root", "RECREATE");
-//
-//   TTree Result_tree("Result_tree","");
-//   Result_tree.Branch("eventnumber", &eventnumber);
-//   Result_tree.Branch("om_number", &om_number);
-//   Result_tree.Branch("charge", &charge);
-//   Result_tree.Branch("tracker_hit_side", &tracker_hit_side);
-//   Result_tree.Branch("tracker_hit_layer", &tracker_hit_layer);
-//   Result_tree.Branch("tracker_hit_column", &tracker_hit_column);
-//
-//   std::vector<int> *event_vec = new std::vector<int>;
-//
-//   double prev_calo_hit = -1;
-//   int prev_eventnumber = -1;
-//
-//   for (int i = 0; i < 200; i++) {
-//     tree->GetEntry(i);
-//     if (prev_calo_hit != calo_hit && prev_eventnumber == eventnumber) {
-//       event_vec->push_back(eventnumber);
-//       // cout << "ok" << endl;
-//     }
-//     // cout << "om = " << calo_hit << " and prev = " << prev_calo_hit << "  <<   ev n = " << eventnumber  << " and prev = " << prev_eventnumber << endl;
-//     prev_calo_hit = calo_hit;
-//     prev_eventnumber = eventnumber;
-//   }
-//   // return;
-//   int j = 0;
-//   int compteur = 0;
-//   for (int i = 0; i < 200; i++) {
-//     tree->GetEntry(i);
-//
-//     cout <<"ev n = " << eventnumber  << " and prev = " << event_vec->at(j) << endl;
-//     if (eventnumber == event_vec->at(j)) {
-//       compteur = 1;
-//       Result_tree.Fill();
-//     }
-//     else if(compteur == 1) {
-//       j++;
-//       i-=1;
-//     }
-//     compteur = 0;
-//   }
-//   newfile->cd();
-//   Result_tree.Write();
-//   newfile->Close();
-// }
+int main() {
+  track_cutter();
+  // tri();
+  // R_calculator();
+  return 0;
+}
