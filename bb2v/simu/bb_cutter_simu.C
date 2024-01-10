@@ -36,37 +36,6 @@ bool cathodless_cell_num[2034];
 double source_column_row_mean[6][7];
 double source_column_row_sigma[6][7];
 
-
-double energy_convertor[520];
-
-
-// void energy_convertor_filler(int run) {
-//   TFile tree_file(Form("Bi_fit/fitted_bi_%d.root",run), "READ");
-//   double mean, Chi2;
-//   int om_number, position;
-//   TTree* tree = (TTree*)tree_file.Get("Result_tree");
-//   tree->SetBranchStatus("*",0);
-//   tree->SetBranchStatus("mean",1);
-//   tree->SetBranchAddress("mean", &mean);
-//   tree->SetBranchStatus("om_number",1);
-//   tree->SetBranchAddress("om_number", &om_number);
-//   tree->SetBranchStatus("position",1);
-//   tree->SetBranchAddress("position", &position);
-//   tree->SetBranchStatus("Chi2_ndf",1);
-//   tree->SetBranchAddress("Chi2_ndf", &Chi2);
-//
-//   for (int i = 0; i < tree->GetEntries(); i++) {
-//     tree->GetEntry(i);
-//     if (om_number == 111 ) cout << Chi2 << endl;
-//     if (Chi2 > 0 && Chi2 < 5) {
-//       energy_convertor[om_number] = 0.976/mean;
-//     }
-//     // if (om_number == 111 ) cout << energy_convertor[om_number] << endl;
-//     // else energy_convertor[om_number] = 0;
-//   }
-//   return;
-// }
-
 double z_calculator_gg(double R0, double R5, double R6){
   double z_gg;
   double t_top = (R6 - R0)*12.5E-3;                                 // Put it in µs
@@ -94,7 +63,7 @@ void first_z_selectionner() {
 
   double mean, sigma;
 
-  TFile *file = new TFile("first_z/z_distrib.root", "READ");
+  TFile *file = new TFile("../../first_z/z_distrib.root", "READ");
   TTree* tree = (TTree*)file->Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("mean",1);
@@ -130,71 +99,74 @@ int source_numberer(double z, int column){
   return source_number;
 }
 
-void source_track_selectionner(vector<int> track_side, vector<int> track_layer, vector<int> track_column, int compteur_source[][6], vector<vector<long>> R0, vector<vector<long>> R5, vector<vector<long>> R6, double timestamp, double *z_column) {
-  vector<long> first_R5;
-  vector<long> first_R6;
-  vector<long> first_R0;
-  vector<double> first_column;
-  vector<int> first_side;
-  vector<double> z;
-  vector<double> col;
+void source_track_selectionner(vector<double> track_side, vector<double> track_layer, vector<double> track_column, int compteur_source[], vector<double> z_ini, double timestamp, double *z_column) {
+
+  vector<long> first_z, second_z;
+  vector<double> first_column, second_column;
+  vector<int> first_side, second_side;
 
   for (int i = 0; i < track_layer.size(); i++) {
-    if ((2*R0.at(i).at(0) - timestamp)*6.25e-9 > (-0.2e-6) && (2*R0.at(i).at(0) - timestamp)*6.25e-9 < (50e-6)) {
-      int cellnum = track_side.at(i)*1017 + track_layer.at(i) + track_column.at(i)*9;
-      if (dead_cell_num[cellnum] == false) continue;
-      if (track_layer.at(i) < 4) {
-        for (int j = 0; j < 6; j++) {
-          if (abs(track_column.at(i) - (8.5 + j * 19)) < 3) {
-            compteur_source[track_side.at(i)][j]++;
-            if (track_layer.at(i) == 0 && cathodless_cell_num[cellnum] == true) {
-              first_side.push_back(track_side.at(i));
-              first_column.push_back(track_column.at(i));
-              first_R5.push_back(R5.at(i).at(0));
-              first_R6.push_back(R6.at(i).at(0));
-              first_R0.push_back(R0.at(i).at(0));
-            }
-          }
-        }
+    int cellnum = track_side.at(i)*1017 + track_layer.at(i) + track_column.at(i)*9;
+    if (dead_cell_num[cellnum] == false) continue;
+    if (track_layer.at(i) < 4) {
+      compteur_source[int (track_side.at(i))]++;
+      if (track_layer.at(i) == 0 && cathodless_cell_num[cellnum] == true) {
+        first_side.push_back(track_side.at(i));
+        first_column.push_back(track_column.at(i));
+        first_z.push_back(z_ini.at(i));
       }
-    }
-  }
+      if (track_layer.at(i) == 1 && cathodless_cell_num[cellnum] == true) {
+        second_side.push_back(track_side.at(i));
+        second_column.push_back(track_column.at(i));
+        second_z.push_back(z_ini.at(i));
 
-  for (int i = 0; i < first_column.size(); i++) {
-    for (int j = 0; j < 6; j++) {
-      if (abs(first_column.at(i)- (8.5 + j * 19)) < 3  && compteur_source[first_side.at(i)][j] > 2){
-        z.push_back(z_calculator_gg(first_R0.at(i), first_R5.at(i), first_R6.at(i)));
-        col.push_back(first_column.at(i));
       }
     }
   }
 
 
-  z_column[0] = -1000;
-  z_column[1] = -1000;
+  z_column[0] = -10000;
+  z_column[1] = -10000;
+  z_column[2] = -10000;
+  z_column[3] = -10000;
 
   double column;
   double z_gg;
-  if (z.size() > 0) {
-    if (z.size() > 1) {      // if two cell on the las layer in front of the OM
-      for (int i = 0; i < z.size(); i++) {
-        z_gg += z.at(i);
-        column += col.at(i);
+  if (first_column.size() > 0) {
+    if (first_column.size() > 1) {      // if two cell on the first layer in front of the OM
+      for (int i = 0; i < first_column.size(); i++) {
+        z_gg += first_z.at(i);
+        column += first_column.at(i);
       }
-      z_column[0] = z_gg / z.size();
-      z_column[1] = column / z.size();
+      z_column[0] = z_gg / first_column.size();
+      z_column[1] = column / first_column.size();
     }
     else{
-          z_column[0] = z.at(0);
-          z_column[1] = col.at(0);
+      z_column[0] = first_z.at(0);
+      z_column[1] = first_column.at(0);
     }
   }
+
+  if (second_column.size() > 0) {
+    if (second_column.size() > 1) {      // if two cell on the second layer in front of the OM
+      for (int i = 0; i < second_column.size(); i++) {
+        z_gg += second_z.at(i);
+        column += second_column.at(i);
+      }
+      z_column[2] = z_gg / second_column.size();
+      z_column[3] = column / second_column.size();
+    }
+    else{
+      z_column[2] = second_z.at(0);
+      z_column[3] = second_column.at(0);
+    }
+  }
+
+
 }
 
-void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, vector<int> track_column, int compteur_calo[][20], vector<vector<long>> R0, vector<vector<long>> R5, vector<vector<long>> R6, double timestamp, double *z_column, int *flag6){        /// comparison between the calo column and the tracker layer
-  vector<long> last_R5;
-  vector<long> last_R6;
-  vector<long> last_R0;
+void calo_track_selectionner(vector<double> track_side, vector<double> track_layer, vector<double> track_column, int compteur_calo[][20], vector<double> z_ini, double timestamp, double *z_column, int *flag6){        /// comparison between the calo column and the tracker layer
+  vector<double> last_z;
   vector<double> last_column;
   vector<int> last_side;
   vector<double> z;
@@ -205,34 +177,30 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
 
 
   for (int i = 0; i < track_side.size(); i++) {
-    if ((2*R0.at(i).at(0) - timestamp)*6.25e-9 > (-0.2e-6) && (2*R0.at(i).at(0) - timestamp)*6.25e-9 < (50e-6)) {
       int cellnum = track_side.at(i)*1017 + track_layer.at(i) + track_column.at(i)*9;
       if (dead_cell_num[cellnum] == false) continue;
       if (track_layer.at(i) > 4) {
         for (int j = 0; j < 20; j++) {
-          if (track_column.at(i) >= tab_bas[j] && track_column.at(i) <= tab_haut[j]) compteur_calo[track_side.at(i)][j]++;
+          if (track_column.at(i) >= tab_bas[j] && track_column.at(i) <= tab_haut[j]) compteur_calo[int (track_side.at(i))][j]++;
         }
         // cout << "layer : " << track_layer.at(i) << endl;
         if (track_layer.at(i) == 8 && cathodless_cell_num[cellnum] == true) {
           *flag6 = 1;
           last_column.push_back(track_column.at(i));
           last_side.push_back(track_side.at(i));
-          last_R5.push_back(R5.at(i).at(0));
-          last_R6.push_back(R6.at(i).at(0));
-          last_R0.push_back(R0.at(i).at(0));
-
+          last_z.push_back(z_ini.at(i));
         }
       }
     }
-  }
-  // cout << "source : "<< *flag6 << endl;
+
+  // out << "source : "<< *flag6 << endl;
 
 
   if (*flag6 == 9) *flag6 = 0;
   for (int i = 0; i < last_column.size(); i++) {
     for (int j = 0; j < 20; j++) {
       if (last_column.at(i) >= tab_bas[j] && last_column.at(i) <= tab_haut[j] && compteur_calo[last_side.at(i)][j] > 3){
-        z.push_back(z_calculator_gg(last_R0.at(i), last_R5.at(i), last_R6.at(i)));
+        z.push_back(last_z.at(i));
         col.push_back(last_column.at(i));
       }
     }
@@ -261,13 +229,18 @@ void calo_track_selectionner(vector<int> track_side, vector<int> track_layer, ve
   }
 }
 
-int calo_source_track(int compteur_source[][6], int compteur_calo[][20], int calo_column, int calo_side, int* flag4, int *flag5){        /// source localiser
+int calo_source_track(int compteur_source[], int compteur_calo[][20], int om_num, int* flag4, int *flag5){        /// source localiser
+
+  int calo_side, calo_column;
+  if (om_num < 260) calo_side = 0;
+  else calo_side = 1;
+  calo_column = (om_num - calo_side*260) / 13;
   if (compteur_calo[calo_side][calo_column] >= 3) *flag4 = 1;
   else if(compteur_calo[calo_side][calo_column] >= 1) *flag4 = 2;
   else *flag4 = 0;
   if (compteur_calo[calo_side][calo_column] >= 3) {
     for (int i = 0; i < 20; i++) {
-      if (compteur_source[calo_side][i] >= 2){
+      if (compteur_source[calo_side] >= 2){
         *flag5 = 1;
         return 1;
       }
@@ -290,12 +263,11 @@ int gg_counter(double timestamp, vector<vector<long>> R0, vector<int> tracker_si
   return gg_counter;
 }
 
-void dead_catohdless_cell(string run){
+void dead_catohdless_cell(){
 
   double R0, R5, R6;
   int cell_number;
-  cout << run << endl;
-  TFile *newfile = new TFile(Form("tried_R_%s.root", run.c_str()), "READ");
+  TFile *newfile = new TFile("../../tried_R_1058.root", "READ");
   TTree* tree = (TTree*)newfile->Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("R0",1);
@@ -321,97 +293,68 @@ void dead_catohdless_cell(string run){
   }
 }
 
-void track_cutter(string run) {
-  // energy_convertor_filler(run);
+void track_cutter() {
 
   first_z_selectionner();
 
   memset (cathodless_cell_num, true, 2034);
   memset (dead_cell_num, true, 2034);
-  dead_catohdless_cell(run);
+  dead_catohdless_cell();
 
-  TFile *file = new TFile(Form("data/snemo_run-%s_udd.root", run.c_str()), "READ");
-  std::vector<vector<short>> *waveform = new std::vector<vector<short>>;
-  std::vector<vector<long>> *R0 = new std::vector<vector<long>>;
-  std::vector<vector<long>> *R5 = new std::vector<vector<long>>;
-  std::vector<vector<long>> *R6 = new std::vector<vector<long>>;
-  std::vector<long> *timestamp = new std::vector<long>;
-  std::vector<int> *calo_type = new std::vector<int>;
-  std::vector<int> *calo_side = new std::vector<int>;
-  std::vector<int> *calo_wall = new std::vector<int>;
-  std::vector<int> *calo_column = new std::vector<int>;
-  std::vector<int> *calo_row = new std::vector<int>;
-  std::vector<int> *calo_charge = new std::vector<int>;
-  std::vector<int> *calo_ampl = new std::vector<int>;
-  std::vector<int> *tracker_side = new std::vector<int>;
-  std::vector<int> *tracker_column = new std::vector<int>;
-  std::vector<int> *tracker_layer = new std::vector<int>;
-  std::vector<int> *cut_track_side = new std::vector<int>;
-  std::vector<int> *cut_track_layer = new std::vector<int>;
+  std::vector<int> *om_num = new std::vector<int>;
+  std::vector<int> *calo_nohits = new std::vector<int>;
+  std::vector<double> *energy_ubc = new std::vector<double>;
+  std::vector<double> *energy_u = new std::vector<double>;
+  std::vector<double> *energy_bc = new std::vector<double>;
+  std::vector<double> *energy = new std::vector<double>;
+  std::vector<double> *calo_timestamp = new std::vector<double>;
+  std::vector<int> *tracker_nohits = new std::vector<int>;
+  std::vector<double> *tracker_side = new std::vector<double>;
+  std::vector<double> *tracker_layer = new std::vector<double>;
+  std::vector<double> *tracker_column = new std::vector<double>;
+  std::vector<double> *z_gg = new std::vector<double>;
   std::vector<int> *calo_nohit_om_time = new std::vector<int>;
-  std::vector<int> *rising_cell = new std::vector<int>;
 
-  int eventnumber, calo_nohits, tracker_nohits;
-
-  TTree* tree = (TTree*)file->Get("SimData");
+  TFile *file = new TFile("simu_Tl_208_10G.root", "READ");
+  int eventnumber;
+  TTree* tree = (TTree*)file->Get("Result_tree");
   tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("header.eventnumber",1);
-  tree->SetBranchAddress("header.eventnumber", &eventnumber);
-  tree->SetBranchStatus("digicalo.nohits",1);
-  tree->SetBranchAddress("digicalo.nohits", &calo_nohits);
-  tree->SetBranchStatus("digicalo.timestamp",1);
-  tree->SetBranchAddress("digicalo.timestamp", &timestamp);
-  tree->SetBranchStatus("digicalo.waveform",1);
-  tree->SetBranchAddress("digicalo.waveform", &waveform);
-  tree->SetBranchStatus("digicalo.type",1);
-  tree->SetBranchAddress("digicalo.type", &calo_type);
-  tree->SetBranchStatus("digicalo.side",1);
-  tree->SetBranchAddress("digicalo.side", &calo_side);
-  tree->SetBranchStatus("digicalo.wall",1);
-  tree->SetBranchAddress("digicalo.wall", &calo_wall);
-  tree->SetBranchStatus("digicalo.column",1);
-  tree->SetBranchAddress("digicalo.column", &calo_column);
-  tree->SetBranchStatus("digicalo.row",1);
-  tree->SetBranchAddress("digicalo.row", &calo_row);
-  tree->SetBranchStatus("digicalo.charge",1);
-  tree->SetBranchAddress("digicalo.charge", &calo_charge);
-  tree->SetBranchStatus("digicalo.peakamplitude",1);
-  tree->SetBranchAddress("digicalo.peakamplitude", &calo_ampl);
-  tree->SetBranchStatus("digitracker.nohits",1);
-  tree->SetBranchAddress("digitracker.nohits", &tracker_nohits);
-  tree->SetBranchStatus("digitracker.side",1);
-  tree->SetBranchAddress("digitracker.side", &tracker_side);
-  tree->SetBranchStatus("digitracker.layer",1);
-  tree->SetBranchAddress("digitracker.layer", &tracker_layer);
-  tree->SetBranchStatus("digitracker.column",1);
-  tree->SetBranchAddress("digitracker.column", &tracker_column);
-  tree->SetBranchStatus("digitracker.anodetimestampR0",1);
-  tree->SetBranchAddress("digitracker.anodetimestampR0", &R0);
-  tree->SetBranchStatus("digitracker.bottomcathodetimestamp",1);
-  tree->SetBranchAddress("digitracker.bottomcathodetimestamp", &R5);
-  tree->SetBranchStatus("digitracker.topcathodetimestamp",1);
-  tree->SetBranchAddress("digitracker.topcathodetimestamp", &R6);
-  tree->SetBranchStatus("digicalo.rising_cell",1);
-  tree->SetBranchAddress("digicalo.rising_cell", &rising_cell);
+  tree->SetBranchStatus("calo_nohits",1);
+  tree->SetBranchAddress("calo_nohits", &calo_nohits);
+  tree->SetBranchStatus("om_id",1);
+  tree->SetBranchAddress("om_id", &om_num);
+  tree->SetBranchStatus("energyvis_ubc",1);
+  tree->SetBranchAddress("energyvis_ubc", &energy_ubc);
+  tree->SetBranchStatus("energyvis",1);
+  tree->SetBranchAddress("energyvis", &energy);
+  tree->SetBranchStatus("calo_timestamp",1);
+  tree->SetBranchAddress("calo_timestamp", &calo_timestamp);
+  tree->SetBranchStatus("tracker_nohits",1);
+  tree->SetBranchAddress("tracker_nohits", &tracker_nohits);
+  tree->SetBranchStatus("tracker_side",1);
+  tree->SetBranchAddress("tracker_side", &tracker_side);
+  tree->SetBranchStatus("tracker_layer",1);
+  tree->SetBranchAddress("tracker_layer", &tracker_layer);
+  tree->SetBranchStatus("tracker_column",1);
+  tree->SetBranchAddress("tracker_column", &tracker_column);
+  tree->SetBranchStatus("z_gg",1);
+  tree->SetBranchAddress("z_gg", &z_gg);
   std::vector<int> flag;
   std::vector<int> flag0;
   std::vector<int> flag1;
-  std::vector<int> flag2;
   std::vector<int> flag3;
   std::vector<int> flag4;
   std::vector<int> flag5;
   std::vector<int> flag6;
   std::vector<int> flag7;
 
-  int compteur_source[2][6] = {0};
+  int compteur_source[2] = {0};
   int compteur_calo[2][20] = {0};
   double* z_column_last = new double[2];
-  double* z_column_first = new double[2];
-  int om_num;
-
-  TFile *newfile = new TFile(Form("cut_%s_calibrated.root", run.c_str()), "RECREATE");
+  double* z_column_first = new double[4];
+  TFile *newfile = new TFile("cut_Tl_simu.root", "RECREATE");
   int calo_compteur_nohits = 0;
-  double z_last_gg, z_first_gg;
+  double z_last_gg, z_first_gg, z_second_gg;
   std::vector<int> om_number;
   std::vector<int> charge;
   std::vector<int> amplitude;
@@ -422,36 +365,35 @@ void track_cutter(string run) {
   std::vector<double> last_column;
   std::vector<double> vec_z_first_gg;
   std::vector<double> first_column;
-  std::vector<double> energy;
+  std::vector<double> vec_z_second_gg;
+  std::vector<double> second_column;
 
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("eventnumber", &eventnumber);
   Result_tree.Branch("ncalo_tot", &calo_compteur_nohits);
   Result_tree.Branch("ngg_tot", &tracker_nohits);
-  Result_tree.Branch("om_number", &om_number);
-  Result_tree.Branch("charge", &charge);
-  Result_tree.Branch("amplitude", &amplitude);
+  Result_tree.Branch("om_number", &om_num);
+  Result_tree.Branch("energyvis", &energy);
+  Result_tree.Branch("energyvis_u", &energy_u);
+  Result_tree.Branch("energyvis_bc", &energy_bc);
+  Result_tree.Branch("energyvis_ubc", &energy_ubc);
   Result_tree.Branch("calo_tdc", &calo_tdc);
   Result_tree.Branch("gg_associated", &associated_track);
   Result_tree.Branch("z_last_gg", &vec_z_last_gg);
   Result_tree.Branch("last_column", &last_column);
+  Result_tree.Branch("z_second_gg", &vec_z_second_gg);
+  Result_tree.Branch("second_column", &second_column);
   Result_tree.Branch("z_first_gg", &vec_z_first_gg);
   Result_tree.Branch("first_column", &first_column);
-  Result_tree.Branch("source_number", &source);
   Result_tree.Branch("flag", &flag);
   Result_tree.Branch("flag_e_event", &flag0);
   Result_tree.Branch("flag_charge", &flag1);
-  Result_tree.Branch("flag_associated_nohit", &flag2);
   Result_tree.Branch("flag_MW", &flag3);
   Result_tree.Branch("flag_calo_square", &flag4);
   Result_tree.Branch("flag_source_square", &flag5);
   Result_tree.Branch("flag_last_column", &flag6);
   Result_tree.Branch("flag_last_z", &flag7);
   Result_tree.Branch("calo_nohit_om_time", &calo_nohit_om_time);
-  Result_tree.Branch("energy", &energy);
-  Result_tree.Branch("calo_timestamp", &timestamp);
-  Result_tree.Branch("rising_cell", &rising_cell);
-  Result_tree.Branch("waveform", &waveform);
 
   for (int i = 0; i < tree->GetEntries(); i++) {      //loop on event number
   // for (int i = 14034; i < 14035; i++) {      //loop on event number
@@ -461,17 +403,21 @@ void track_cutter(string run) {
   }
     tree->GetEntry(i);
 
-    for (int k = 0; k < calo_nohits; k++) {      //k : loop on calo hit number
+    for (int k = 0; k < calo_nohits->at(0); k++) {      //k : loop on calo hit number
       z_column_last[0] = 0;
       z_column_last[1] = 0;
       z_column_first[0] = 0;
       z_column_first[1] = 0;
+      z_column_first[2] = 0;
+      z_column_first[3] = 0;
 
       last_column.push_back(-10000);
       first_column.push_back(-10000);
+      second_column.push_back(-10000);
       associated_track.push_back(-10000);
       vec_z_last_gg.push_back(-10000);
       vec_z_first_gg.push_back(-10000);
+      vec_z_second_gg.push_back(-10000);
 
       int flag4_int = 0;
       int flag5_int = 0;
@@ -479,85 +425,68 @@ void track_cutter(string run) {
 
       flag0.push_back(9);
       flag1.push_back(9);
-      flag2.push_back(9);
       flag3.push_back(9);
       flag4.push_back(9);
       flag5.push_back(9);
       flag6.push_back(9);
       flag7.push_back(9);
-      source.push_back(-30);
       calo_nohit_om_time->push_back(0);
+      calo_tdc.push_back(calo_timestamp->at(k));
 
 
-      for (int k2 = 0; k2 < calo_nohits; k2++) {
+      for (int k2 = 0; k2 < calo_nohits->at(0); k2++) {
         if (k2 == k) continue;
-        if (abs(timestamp->at(k2) - timestamp->at(k)) < 16 && -calo_ampl->at(k2) > 200) calo_nohit_om_time->back()++;
+              if (abs(calo_timestamp->at(k2) - calo_timestamp->at(k)) < 16) calo_nohit_om_time->back()++;
       }
 
-      if (calo_type->at(k) == 0) om_num = calo_side->at(k)*260 + calo_column->at(k)*13 + calo_row->at(k);
-      if (calo_type->at(k) == 1) om_num = 520 + calo_side->at(k)*64 +  calo_wall->at(k)*32 + calo_column->at(k)*16 + calo_row->at(k);
-      if (calo_type->at(k) == 2) om_num = 520 + 128 + calo_side->at(k)*32 + calo_wall->at(k)*16 + calo_column->at(k);
-      om_number.push_back(om_num);
-      energy.push_back(-calo_charge->at(k)*energy_convertor[om_num]);
-      charge.push_back(-calo_charge->at(k));
-      amplitude.push_back(-calo_ampl->at(k));
-      calo_tdc.push_back(timestamp->at(k));
-
-      // if (om_num == 140 && -calo_ampl->at(k) > 200) {
-      //   cout << "event : " << i << " hit " << k << " calo ampl = " << -calo_charge->at(k) << endl;
-      // }
-      if (-calo_ampl->at(k) > 200 && om_num != 74 && om_num != 98 && om_num != 80 && om_num != 119 && om_num != 136 && om_num != 146 && om_num != 318 && om_num != 369 && om_num != 461) {      // condition to cut small charge and keep only MW OM
-      // if (-calo_ampl->at(k) > 200) {      // condition to cut small charge
-        flag1.back ()= 1;
+      // if (energy->at(k) > 0.1){
+      if (energy->at(k) > 0.1 && om_num->at(k) != 74 && om_num->at(k) != 98 && om_num->at(k) != 80 && om_num->at(k) != 119 && om_num->at(k) != 136 && om_num->at(k) != 146 && om_num->at(k) != 318 && om_num->at(k) != 369 && om_num->at(k) != 461) {      // condition to cut small charge and keep only MW OM
+        flag1.back()= 1;
         int timed_gg;
-        memset(compteur_source, 0, sizeof(int) * 2 * 6);
+        memset(compteur_source, 0, sizeof(int) * 2);
         memset(compteur_calo, 0, sizeof(int) * 2 * 20);
 
-        source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *R0, *R5, *R6, timestamp->at(k), z_column_first);
-        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *R0, *R5, *R6, timestamp->at(k), z_column_last, &flag6_int);
-        calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k), &flag4_int, &flag5_int);
+        source_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_source, *z_gg, calo_timestamp->at(k), z_column_first);
+        calo_track_selectionner(*tracker_side, *tracker_layer, *tracker_column, compteur_calo, *z_gg, calo_timestamp->at(k), z_column_last, &flag6_int);
+        calo_source_track(compteur_source, compteur_calo, om_num->at(k), &flag4_int, &flag5_int);
         flag6.back() = flag6_int;
-        z_last_gg = z_column_last[0];
-        z_first_gg = z_column_first[0];
-        timed_gg = gg_counter(timestamp->at(k), *R0, *tracker_side, *tracker_layer, *tracker_column, om_num);
+        z_last_gg = z_column_last[0]/1500.;
+        z_first_gg = z_column_first[0]/1500.;
+        z_second_gg  = z_column_first[3]/1500.;
         calo_compteur_nohits++;
-        int first_gg_row = row_to_source(z_column_first[1]);
-        int source_number = source_numberer(z_column_first[0], first_gg_row);
-        // if (z_column_first[0] < 1 && z_column_first[0] > -1) cout << "z = " << z_column_first[0] << " and row  = "<< z_column_first[1] << " and row = " << first_gg_row << endl;
-        // if (z_column_first[0] < 1 && z_column_first[0] > -1) cout << "-> source : " << source_number << endl;
-        // cout << "calo_hit = " << om_num << endl;
-        // cout << "calo source track = " << calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k)) << endl;
 
-
-        if (timed_gg > 5 && timed_gg < 16) flag2.back() = 1;
-        else if (flag2.at(k) == 9) flag2.back() = 0;
-        if (om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12) flag3.back() = 1;
+        if (om_num->at(k) < 520 && om_num->at(k) % 13 != 0 && om_num->at(k) % 13 != 12) flag3.back() = 1;
         else if (flag3.at(k) == 9) flag3.back() = 1;
 
-        if (om_num < 520 && om_num % 13 != 0 && om_num % 13 != 12){
+        if (om_num->at(k) < 520 && om_num->at(k) % 13 != 0 && om_num->at(k) % 13 != 12){
 
           double calo_row2z = -15;
           double z_last_gg_min = -15;
           double z_last_gg_max = -15;
 
-          if (calo_type->at(k) == 0){
-            calo_row2z = -1.1165 +0.18714*calo_row->at(k);
-            z_last_gg_min = calo_row2z - 0.1;
-            z_last_gg_max = calo_row2z + 0.1;
+          double tab_z[11] = {0.86, 0.68, 0.52, 0.33, 0.17, 0, 0.18, 0.34, 0.52, 0.67, 0.84};
+
+          if (flag3.back() == 1) {
+            calo_row2z = 0.17*(om_num->at(k)%13) - 1.02;
+            z_last_gg_min = calo_row2z - 0.091;
+            z_last_gg_max = calo_row2z + 0.091;
           }
 
+
+
           last_column.back() = z_column_last[1];
-          first_column.back() = z_column_first[1];
+          first_column.back() = z_column_first[2];
+          second_column.back() = z_column_first[3];
           associated_track.back() = timed_gg;
           vec_z_last_gg.back() = z_last_gg;
           vec_z_first_gg.back() = z_first_gg;
+          vec_z_second_gg.back() = z_second_gg;
 
           if (flag7.at(k) == 9) flag7.back() = 0;
-          if (z_last_gg <= z_last_gg_max && z_last_gg >= z_last_gg_min) {
+          if (0.1 >= abs(abs(z_last_gg) - tab_z[om_num->at(k)]) ) {
             flag7.back() = 1;
-            source.back() = source_number;
           }
-          if (calo_source_track(compteur_source, compteur_calo, calo_column->at(k), calo_side->at(k), &flag4_int, &flag5_int) == 1 && z_last_gg <= z_last_gg_max && z_last_gg >= z_last_gg_min && flag6_int == 1 && flag2.back() == 1){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
+          if (calo_source_track(compteur_source, compteur_calo, om_num->at(k), &flag4_int, &flag5_int) == 1 && z_last_gg <= z_last_gg_max && z_last_gg >= z_last_gg_min && flag6_int == 1){//  && source_number >= 0) {       //// Delta z moyen = 0.268589cm 0.29 à 3 sigma, soit 0.1852 (1)de -1 à 1 de moyenneur gategauss
             // cout << "ok" << endl;
             flag0.back() = 1;
             // cout << flag0.back() << endl;;
@@ -569,7 +498,6 @@ void track_cutter(string run) {
           flag5.back() = flag5_int;
         }
         else {
-          source.push_back(-10);
           flag0.back() = 0;
         }
 
@@ -578,7 +506,7 @@ void track_cutter(string run) {
       else {
         flag1.back() = 0;
       }
-      flag.push_back(flag0.at(k) +flag1.at(k)*10 +flag2.at(k)*100 + flag3.at(k)*1000 + flag4.at(k)*10000 + flag5.at(k)*100000 + flag6.at(k)*1000000 + flag7.at(k)*10000000);
+      flag.push_back(flag0.at(k) +flag1.at(k)*10 + flag3.at(k)*1000 + flag4.at(k)*10000 + flag5.at(k)*100000 + flag6.at(k)*1000000 + flag7.at(k)*10000000);
     }
 
     // for (size_t j = 0; j < flag6.size(); j++) {
@@ -589,7 +517,6 @@ void track_cutter(string run) {
     Result_tree.Fill();
     flag0.clear();
     flag1.clear();
-    flag2.clear();
     flag3.clear();
     flag4.clear();
     flag5.clear();
@@ -601,14 +528,15 @@ void track_cutter(string run) {
     amplitude.clear();
     calo_tdc.clear();
     associated_track.clear();
-    source.clear();
     last_column.clear();
     vec_z_last_gg.clear();
     first_column.clear();
     vec_z_first_gg.clear();
+    second_column.clear();
+    vec_z_second_gg.clear();
     calo_compteur_nohits = 0;
     calo_nohit_om_time->clear();
-    energy.clear();
+    energy->clear();
   }
 
 
@@ -617,7 +545,6 @@ void track_cutter(string run) {
   newfile->Close();
   cout << "OK" << endl;
 }
-
 
 void tri(string run) {
   gStyle->SetOptFit(1);
@@ -844,147 +771,6 @@ TFile *file = new TFile(Form("data/new_timestamp_%s.root",run.c_str()), "READ");
 
 }
 
-//
-void waveformer() {
-
-  int ncalo_tot;
-  std::vector<int> *flag_e_event = new std::vector<int>;
-  std::vector<int> *om_number = new std::vector<int>;
-  std::vector<int> *flag_charge = new std::vector<int>;
-  std::vector<int> *flag_associated_nohit = new std::vector<int>;
-  std::vector<vector<short>> *waveform = new std::vector<vector<short>>;
-  std::vector<double> *energy = new std::vector<double>;
-
-  TFile *file = new TFile("cut_974_no.root", "READ");
-  TTree* tree = (TTree*)file->Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("ncalo_tot",1);
-  tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
-  tree->SetBranchStatus("om_number",1);
-  tree->SetBranchAddress("om_number", &om_number);
-  tree->SetBranchStatus("flag_e_event",1);
-  tree->SetBranchAddress("flag_e_event", &flag_e_event);
-  tree->SetBranchStatus("flag_associated_nohit",1);
-  tree->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
-  tree->SetBranchStatus("waveform",1);
-  tree->SetBranchAddress("waveform", &waveform);
-  tree->SetBranchStatus("energy",1);
-  tree->SetBranchAddress("energy", &energy);
-  TH2D* wave = new TH2D("wave","wave", 520, 0, 520, 1024, 0, 1024);
-  TH1D* wave_th1 = new TH1D("wave1d", "wave1d", 1024, 0, 1024);
-
-  int compteurth1 = 0;
-  float compteur[520] = {0};
-  for (int i = 0; i < tree->GetEntries()/10; i++) {
-    tree->GetEntry(i);
-
-    for (int j = 0; j < om_number->size(); j++) {
-      if (flag_e_event->at(j) == 1 && flag_associated_nohit->at(j) == 1 && energy->at(j) > 0.7) {
-        compteur[om_number->at(j)]++;
-        for (int k = 0; k < 1024; k++) {
-          wave->Fill(om_number->at(j), k, waveform->at(j).at(k));
-        }
-      }
-    }
-  }
-
-  float moyenne[520];
-  memset(moyenne,0,sizeof(float)*520);
-  for (int i = 0; i < 520; i++) {
-    for (int k = 0; k < 1024; k++) {
-      wave->SetBinContent(i+1,k+1, wave->GetBinContent(i+1, k+1)/compteur[i]);
-      wave->SetBinError(i+1,k+1,0);
-      if (k>0 && k < 193) {
-        moyenne[i]+=wave->GetBinContent(i+1, k+1);
-      }
-
-    }
-
-    moyenne[i] = moyenne[i]/192.;
-    if (moyenne[i] == 0) moyenne[i] =1;
-    // wave->SetBinContent(i,1024,wave->GetBinContent(i, 1023));
-    // wave->SetBinError(i,1024,0);
-  }
-
-  for (int i = 0; i < 520; i++) {
-    for (int k = 0; k < 1024; k++) {
-
-      wave->SetBinContent(i+1,k+1,moyenne[i]-wave->GetBinContent(i+1,k+1));
-    }
-  }
-
-  float peak_amplitude;
-  int om;
-  TFile *newfile = new TFile("test.root", "RECREATE");
-  TTree Result_tree("Result_tree","");
-  Result_tree.Branch("peak_amplitude", &peak_amplitude);
-  Result_tree.Branch("om", &om);
-
-  TH2F* mean_wave = new TH2F("mean_wave","mean_wave",1024,0,1024,500,0,500);
-
-  for (int i = 0; i < 520; i++) {
-    for (int k = 0; k < 1024; k++) {
-      mean_wave->SetBinContent(k+1, round(wave->GetBinContent(i+1,k+1)), mean_wave->GetBinContent(i+1,k+1) + 1);
-    }
-    om = i;
-    peak_amplitude = wave->ProjectionY("test",i+1,i+1)->GetMaximum();
-    Result_tree.Fill();
-  }
-
-  newfile->cd();
-  Result_tree.Write();
-  wave->Write();
-  mean_wave->Write();
-  newfile->Close();
-}
-
-void biplot_eres_wave_mean() {
-
-  float peak_amplitude, eres;
-  int om;
-  TFile *file = new TFile("mean_waveform.root", "READ");
-  TTree* tree = (TTree*)file->Get("Result_tree");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("peak_amplitude",1);
-  tree->SetBranchAddress("peak_amplitude", &peak_amplitude);
-  tree->SetBranchStatus("om",1);
-  tree->SetBranchAddress("om", &om);
-
-  float amplitude[520];
-  for (int i = 0; i < 520; i++) {
-    tree->GetEntry(i);
-    amplitude[om] = peak_amplitude;
-  }
-
-  TFile *file2 = new TFile("ERES.root", "READ");
-  TTree* tree2 = (TTree*)file2->Get("Result_tree");
-  tree2->SetBranchStatus("*",0);
-  tree2->SetBranchStatus("eres",1);
-  tree2->SetBranchAddress("eres", &eres);
-  tree2->SetBranchStatus("om",1);
-  tree2->SetBranchAddress("om", &om);
-
-  float eres_tab[520];
-  for (int i = 0; i < 520; i++) {
-    tree2->GetEntry(i);
-    eres_tab[om] = eres;
-  }
-
-  TH2F* biplot = new TH2F("mean_wave_eres", "mean_wave_eres", 150,250,400,150,10,25);
-  gROOT->cd();
-  for (size_t i = 0; i < 520; i++) {
-    if (eres_tab[i] > 0 && amplitude[i] > 0) {
-      biplot->SetBinContent(amplitude[i]-250, (eres_tab[i]-10)*10, biplot->GetBinContent(amplitude[i+1], eres_tab[i+1])+1);
-    }
-  }
-
-
-  TFile *newfile = new TFile("test.root", "RECREATE");
-
-  newfile->cd();
-  biplot->Write();
-  newfile->Close();
-}
 
 int main(int argc, char const *argv[]) {
 
@@ -998,14 +784,8 @@ int main(int argc, char const *argv[]) {
       full = 1;
     }
   }
-  if (full == 1) {
-    tri(run);
-    R_calculator(run);
-  }
-  track_cutter(run);
 
+  track_cutter();
 
-  // waveformer();
-  // biplot_eres_wave_mean();
   return 0;
 }

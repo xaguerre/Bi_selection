@@ -32,7 +32,7 @@ using namespace RooFit;
 using namespace std;
 
 
-double z_bas[7] = {-1,-0.75,-0.45, -0.2, 0.18, 0.5, 0.8};
+double z_bas[7] = {-1,-0.75,-0.45, -0.15, 0.18, 0.5, 0.8};
 double z_haut[7] = {-0.8,-0.5,-0.15, 0.15, 0.4, 0.7, 1};
 int colonne_gauche[6] = {4, 22, 42, 60, 78, 97};
 int colonne_droite[6] = {14, 33, 52, 72, 91, 110};
@@ -58,26 +58,29 @@ void gauss_fitter() {
   std::vector<double> *z_first_gg = new std::vector<double>;
   std::vector<double> *first_column = new std::vector<double>;
   int nelec, ncalo_tot;
+  std::vector<int> *flag_e_event = new std::vector<int>;
+  std::vector<int> *flag_associated_nohit = new std::vector<int>;
 
-  TFile tree_file("../cutted_bi.root", "READ");
+
+  TFile tree_file("../cut_974.root", "READ");
   TTree* tree = (TTree*)tree_file.Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("z_first_gg",1);
   tree->SetBranchAddress("z_first_gg", &z_first_gg);
   tree->SetBranchStatus("first_column",1);
   tree->SetBranchAddress("first_column", &first_column);
-  tree->SetBranchStatus("nelec",1);
-  tree->SetBranchAddress("nelec", &nelec);
-  tree->SetBranchStatus("ncalo_tot",1);
-  tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree->SetBranchStatus("flag_e_event",1);
+  tree->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree->SetBranchStatus("flag_associated_nohit",1);
+  tree->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
   gROOT->cd();
 
-  for(int i = 0; i < 4; i++){                   //loop on source column
-    for(int j = 1; j < 6; j++){                 //loop on source row
+  for(int i = 0; i < 6; i++){                   //loop on source column
+    for(int j = 0; j < 7; j++){                 //loop on source row
       column_number = i;
       row_number = j;
       TH1D *z_distrib = new TH1D ("z_distrib", "", 100, -1, 1);
-      tree->Project("z_distrib", "z_first_gg", Form("z_first_gg > %f && z_first_gg < %f && ncalo_tot == 1 && first_column > %d && first_column < %d", z_bas[j], z_haut[j], colonne_gauche[i], colonne_droite[i]));
+      tree->Project("z_distrib", "z_first_gg", Form("z_first_gg > %f && z_first_gg < %f && first_column > %d && first_column < %d && flag_e_event == 1 && flag_associated_nohit == 1", z_bas[j], z_haut[j], colonne_gauche[i], colonne_droite[i]));
 
       TCanvas* canvas = new TCanvas;
       TF1 *f_gauss = new TF1 ("f_gauss", "gaus(0)", z_bas[j], z_haut[j]);

@@ -1639,9 +1639,10 @@ void sndisplay_calorimeter_test_values (bool with_palette = true)
   // merge IT and FR canvas side by side using image magick (if installed)
   gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
 }
-
-void sndisplay_calorimeter_cut_rate (bool with_palette = true)
+//
+void sndisplay_calorimeter_cut_rate_e ()
 {
+  bool with_palette = true;
   sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
 
   sncalo->draw_content_label("%.1f");
@@ -1658,14 +1659,19 @@ void sndisplay_calorimeter_cut_rate (bool with_palette = true)
   std::vector<int> *flag_source_square = new std::vector<int>;
   std::vector<int> *flag_last_column = new std::vector<int>;
   std::vector<int> *flag_last_z = new std::vector<int>;
+  std::vector<double> *z_last_gg = new std::vector<double>;
+  std::vector<int> *flag = new std::vector<int>;
+  std::vector<int> *calo_nohit_om_time = new std::vector<int>;
 
-  TFile *file = new TFile("cut_bi_newest_dead.root", "READ");
+  TFile *file = new TFile("cut_bi_10.root", "READ");
   TTree* tree = (TTree*)file->Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("ncalo_tot",1);
   tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
   tree->SetBranchStatus("om_num",1);
   tree->SetBranchAddress("om_num", &om_number);
+  tree->SetBranchStatus("flag",1);
+  tree->SetBranchAddress("flag", &flag);
   tree->SetBranchStatus("flag_e_event",1);
   tree->SetBranchAddress("flag_e_event", &flag_e_event);
   tree->SetBranchStatus("flag_charge",1);
@@ -1684,21 +1690,34 @@ void sndisplay_calorimeter_cut_rate (bool with_palette = true)
   tree->SetBranchAddress("flag_last_z", &flag_last_z);
   tree->SetBranchStatus("energyvis_ubc",1);
   tree->SetBranchAddress("energyvis_ubc", &energyvis_ubc);
+  tree->SetBranchStatus("z_last_gg",1);
+  tree->SetBranchAddress("z_last_gg", &z_last_gg);
 
+  TH2D* Gamma = new TH2D("Gamma","Gamma",520,0,520,1000,0,2);
+
+  int e_compteur;
   int compteur =0;
+
   double rate_simu[712];
   memset (rate_simu, 0, 712*sizeof(double));
   for (int i = 0; i < tree->GetEntries(); i++) {
     tree->GetEntry(i);
+    e_compteur = 0;
+    // for (int j = 0; j < flag_e_event->size(); j++)
+    //   if (flag_e_event->at(j) == 1 && energyvis_ubc->at(j)>0.7 && ncalo_tot > 1) e_compteur++;
+
     for (int j = 0; j < flag_e_event->size(); j++) {
-      // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_e_event->at(j) == 1) {
-      if (ncalo_tot < 2 && flag_e_event->at(j) == 1 ) {
+      if (flag_e_event->at(j) == 1 && energyvis_ubc->at(j) > 0.7 && ncalo_tot <2) {
+      // if (flag_e_event->at(j) == 0 && e_compteur > 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+
         rate_simu[om_number->at(j)]++;
         compteur++;
       }
     }
   }
+
   cout << "total simu event : " << compteur << endl;
+  std::vector<long> *timestamp = new std::vector<long>;
 
   TFile *file2 = new TFile("../cut_974.root", "READ");
   TTree* tree2 = (TTree*)file2->Get("Result_tree");
@@ -1707,6 +1726,8 @@ void sndisplay_calorimeter_cut_rate (bool with_palette = true)
   tree2->SetBranchAddress("ncalo_tot", &ncalo_tot);
   tree2->SetBranchStatus("om_number",1);
   tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("flag",1);
+  tree2->SetBranchAddress("flag", &flag);
   tree2->SetBranchStatus("flag_e_event",1);
   tree2->SetBranchAddress("flag_e_event", &flag_e_event);
   tree2->SetBranchStatus("flag_charge",1);
@@ -1725,36 +1746,64 @@ void sndisplay_calorimeter_cut_rate (bool with_palette = true)
   tree2->SetBranchAddress("flag_last_z", &flag_last_z);
   tree2->SetBranchStatus("charge",1);
   tree2->SetBranchAddress("charge", &charge);
+  tree2->SetBranchStatus("z_last_gg",1);
+  tree2->SetBranchAddress("z_last_gg", &z_last_gg);
+  tree2->SetBranchStatus("calo_nohit_om_time",1);
+  tree2->SetBranchAddress("calo_nohit_om_time", &calo_nohit_om_time);
+  tree2->SetBranchStatus("energy",1);
+  tree2->SetBranchAddress("energy", &energyvis_ubc);
+  tree2->SetBranchStatus("calo_timestamp",1);
+  tree2->SetBranchAddress("calo_timestamp", &timestamp);
 
+  int last_j;
   double rate[712];
   memset (rate, 0, 712*sizeof(double));
   int compteur2 =0;
   for (int i = 0; i < tree2->GetEntries(); i++) {
     tree2->GetEntry(i);
-    // cout << "size = " << om_number->size() << endl;
+    e_compteur = 0;
+
+    // for (int j = 0; j < flag_e_event->size(); j++)
+    //   if (flag_e_event->at(j) == 1 ) {
+    //     e_compteur++;
+    //     last_j = j;
+    //   }
+    // if (e_compteur <1) continue;
     for (int j = 0; j < om_number->size(); j++) {
-        // if (charge->at(j)/22000. > 0.6 && ncalo_tot < 2 && flag_e_event->at(j) == 1) {
-          if ( ncalo_tot < 2 && flag_e_event->at(j) == 1 ) {
-            rate[om_number->at(j)]++;
-            compteur2++;
-        // cout << "ok" << endl;
+
+      // float time = abs(timestamp->at(j)-timestamp->at(last_j));
+            // cout << time << endl;/
+      // if (time < 16) cout << time << " and "
+      // if ( energyvis_ubc->at(j)>0.7 && calo_nohit_om_time->at(j) < 2 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_associated_nohit->at(j)==1 && flag_last_column->at(j) == 1 && flag_calo_square->at(j) == 1 && flag_source_square->at(j) == 1 && flag_last_z->at(j) == 1)  {
+      // if (time < 16 && flag_e_event->at(j) == 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+      if (energyvis_ubc->at(j) > 0.7 && flag_e_event->at(j) == 1 && calo_nohit_om_time->at(j) < 2) {
+              // if (om_number->at(j) == 175 && energyvis_ubc->at(j) < 0.4 && energyvis_ubc->at(j) > 0.38) cout << "entry : " << i << endl;
+        // Gamma->Fill(om_number->at(j), energyvis_ubc->at(j));
+        rate[om_number->at(j)]++;
+        compteur2++;
       }
+      // time = 0;
     }
   }
-
+  // TFile *newfile = new TFile("test.root", "RECREATE");
+  // newfile->cd();
+  // Gamma->Write();
+  // newfile->Close();
+  // return;
+  //
   cout << "total data event : " << compteur2 << endl;
-  for (size_t i = 0; i < 520; i++) {
-    std::cout << "rate simu = " << rate_simu[i] << " rate = " << rate[i] << '\n';
-  }
+  // for (size_t i = 0; i < 520; i++) {
+  //   std::cout << "rate simu = " << rate_simu[i] << " rate = " << rate[i] << '\n';
+  // }
 
 
 
   for (int omnum=0; omnum<520; ++omnum) // MW
-    if (rate_simu[omnum] > 0)
-     sncalo->setcontent(omnum, rate_simu[omnum]/(rate[omnum]/1.78));
-     // sncalo->setcontent(omnum, rate_simu[omnum]);
+    if (rate_simu[omnum] > 0 && rate[omnum] > 0)
+    sncalo->setcontent(omnum, rate[omnum]);
+    // sncalo->setcontent(omnum, rate_simu[omnum]/(rate[omnum]/1.78));
 
-  // sncalo->setrange(0, 3); // to force z axis range
+  sncalo->setrange(-1, -1); // to force z axis range
 
   sncalo->draw();
   sncalo->draw1();
@@ -1766,15 +1815,41 @@ void sndisplay_calorimeter_cut_rate (bool with_palette = true)
   // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
 }
 
-void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
+void sndisplay_calorimeter_cut_rate_gamma ()
 {
+  bool with_palette = true;
   sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
-
   sncalo->draw_content_label("%.1f");
+
+
+  double simu_mean[520];
+  memset (simu_mean, 0, 520*sizeof(double));
+  double correction_tab[520];
+  memset (correction_tab, 0, 520*sizeof(double));
+  int om_num;
+  double mean, correction;
+
+  TFile *correction_file = new TFile("Bi_fit/ubc_corrector.root", "READ");
+  TTree* correction_tree = (TTree*)correction_file->Get("Result_tree");
+  correction_tree->SetBranchStatus("*",0);
+  correction_tree->SetBranchStatus("om_number",1);
+  correction_tree->SetBranchAddress("om_number", &om_num);
+  correction_tree->SetBranchStatus("mean",1);
+  correction_tree->SetBranchAddress("mean", &mean);
+  correction_tree->SetBranchStatus("correction",1);
+  correction_tree->SetBranchAddress("correction", &correction);
+
+  for (int i = 0; i < correction_tree->GetEntries(); i++) {
+    correction_tree->GetEntry(i);
+    simu_mean[om_num] = mean;
+    correction_tab[om_num] = correction;
+  }
+  cout << "ubc corrector ok" << endl;
 
   int ncalo_tot;
   std::vector<int> *flag_e_event = new std::vector<int>;
   std::vector<int> *om_number = new std::vector<int>;
+  std::vector<double> *energyvis = new std::vector<double>;
   std::vector<double> *energyvis_ubc = new std::vector<double>;
   std::vector<double> *charge = new std::vector<double>;
   std::vector<int> *flag_charge = new std::vector<int>;
@@ -1784,14 +1859,19 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   std::vector<int> *flag_source_square = new std::vector<int>;
   std::vector<int> *flag_last_column = new std::vector<int>;
   std::vector<int> *flag_last_z = new std::vector<int>;
+  std::vector<double> *z_last_gg = new std::vector<double>;
+  std::vector<int> *flag = new std::vector<int>;
+  std::vector<int> *calo_nohit_om_time = new std::vector<int>;
 
-  TFile *file = new TFile("cut_bi_newest_dead.root", "READ");
+  TFile *file = new TFile("cut_bi_new.root", "READ");
   TTree* tree = (TTree*)file->Get("Result_tree");
   tree->SetBranchStatus("*",0);
   tree->SetBranchStatus("ncalo_tot",1);
   tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
   tree->SetBranchStatus("om_num",1);
   tree->SetBranchAddress("om_num", &om_number);
+  tree->SetBranchStatus("flag",1);
+  tree->SetBranchAddress("flag", &flag);
   tree->SetBranchStatus("flag_e_event",1);
   tree->SetBranchAddress("flag_e_event", &flag_e_event);
   tree->SetBranchStatus("flag_charge",1);
@@ -1810,6 +1890,423 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   tree->SetBranchAddress("flag_last_z", &flag_last_z);
   tree->SetBranchStatus("energyvis_ubc",1);
   tree->SetBranchAddress("energyvis_ubc", &energyvis_ubc);
+  tree->SetBranchStatus("energyvis",1);
+  tree->SetBranchAddress("energyvis", &energyvis);
+  tree->SetBranchStatus("z_last_gg",1);
+  tree->SetBranchAddress("z_last_gg", &z_last_gg);
+
+  TH2D* Gamma_data = new TH2D("Gamma_data","Gamma_data",520,0,520,100,0,2);
+  TH2D* Gamma_simu_ubc = new TH2D("Gamma_simu_ubc","Gamma_simu_ubc",520,0,520,100,0,2);
+  TH2D* Gamma_simu = new TH2D("Gamma_simu","Gamma_simu",520,0,520,100,0,2);
+  TH1D* simu = new TH1D("simu","simu",10,0,10);
+  int e_compteur;
+  int compteur =0;
+
+  double rate_simu[712];
+  memset (rate_simu, 0, 712*sizeof(double));
+  for (int i = 0; i < tree->GetEntries()/10; i++) {
+    tree->GetEntry(i);
+    e_compteur = 0;
+    for (int j = 0; j < flag_e_event->size(); j++)
+      if (flag_e_event->at(j) == 1 && energyvis_ubc->at(j)>0.7 && ncalo_tot > 1) {
+        Gamma_simu_ubc->Fill(om_number->at(j), energyvis_ubc->at(j)*correction_tab[om_number->at(j)]);
+        Gamma_simu->Fill(om_number->at(j), energyvis->at(j));
+
+        e_compteur++;
+      }
+    if (e_compteur <1) continue;
+    for (int j = 0; j < flag_e_event->size(); j++) {
+      if (flag_e_event->at(j) == 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+        // if (flag_e_event->at(j) == 1 && energyvis_ubc->at(j) > 0.7 && ncalo_tot <2) {
+        // Gamma_simu_ubc->Fill(om_number->at(j), energyvis_ubc->at(j)*correction_tab[om_number->at(j)]);
+        // Gamma_simu->Fill(om_number->at(j), energyvis->at(j));
+        simu->Fill(ncalo_tot);
+        rate_simu[om_number->at(j)]++;
+        compteur++;
+      }
+    }
+  }
+
+  cout << "total simu event : " << compteur << endl;
+  std::vector<long> *timestamp = new std::vector<long>;
+
+  TFile *file2 = new TFile("../cut_974.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("ncalo_tot",1);
+  tree2->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("flag",1);
+  tree2->SetBranchAddress("flag", &flag);
+  tree2->SetBranchStatus("flag_e_event",1);
+  tree2->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree2->SetBranchStatus("flag_charge",1);
+  tree2->SetBranchAddress("flag_charge", &flag_charge);
+  tree2->SetBranchStatus("flag_associated_nohit",1);
+  tree2->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
+  tree2->SetBranchStatus("flag_MW",1);
+  tree2->SetBranchAddress("flag_MW", &flag_MW);
+  tree2->SetBranchStatus("flag_calo_square",1);
+  tree2->SetBranchAddress("flag_calo_square", &flag_calo_square);
+  tree2->SetBranchStatus("flag_source_square",1);
+  tree2->SetBranchAddress("flag_source_square", &flag_source_square);
+  tree2->SetBranchStatus("flag_last_column",1);
+  tree2->SetBranchAddress("flag_last_column", &flag_last_column);
+  tree2->SetBranchStatus("flag_last_z",1);
+  tree2->SetBranchAddress("flag_last_z", &flag_last_z);
+  tree2->SetBranchStatus("charge",1);
+  tree2->SetBranchAddress("charge", &charge);
+  tree2->SetBranchStatus("z_last_gg",1);
+  tree2->SetBranchAddress("z_last_gg", &z_last_gg);
+  tree2->SetBranchStatus("calo_nohit_om_time",1);
+  tree2->SetBranchAddress("calo_nohit_om_time", &calo_nohit_om_time);
+  tree2->SetBranchStatus("energy",1);
+  tree2->SetBranchAddress("energy", &energyvis_ubc);
+  tree2->SetBranchStatus("calo_timestamp",1);
+  tree2->SetBranchAddress("calo_timestamp", &timestamp);
+
+  TH1D* data = new TH1D("data","data",10,0,10);
+  int last_j;
+  double rate[712];
+  memset (rate, 0, 712*sizeof(double));
+  int compteur2 =0;
+  for (int i = 0; i < tree2->GetEntries()/10; i++) {
+    tree2->GetEntry(i);
+    e_compteur = 0;
+
+    for (int j = 0; j < flag_e_event->size(); j++)
+      if (flag_e_event->at(j) == 1  && energyvis_ubc->at(j)>0.7 && calo_nohit_om_time->at(j)>1) {
+        Gamma_data->Fill(om_number->at(j), energyvis_ubc->at(j)*simu_mean[om_number->at(j)]);
+        // if (om_number->at(j) == 175) cout << "entry : " << i << " -> om:" << om_number->at(j) << " energy :" << energyvis_ubc->at(j) << endl;
+        e_compteur++;
+        last_j = j;
+      }
+    if (e_compteur <1) continue;
+
+    for (int j = 0; j < om_number->size(); j++) {
+
+      float time = abs(timestamp->at(j)-timestamp->at(last_j));
+      if (time < 16 && flag_e_event->at(j) == 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+        rate[om_number->at(j)]++;
+            data->Fill(calo_nohit_om_time->at(last_j)+1);
+        compteur2++;
+      }
+      time = 0;
+    }
+  }
+  simu->Draw();
+  data->Draw("same");
+  simu->SetLineColor(kRed);
+  return;
+  TFile *newfile = new TFile("test_e.root", "RECREATE");
+  newfile->cd();
+  Gamma_data->Write();
+  Gamma_simu->Write();
+  Gamma_simu_ubc->Write();
+  newfile->Close();
+
+  //
+  cout << "total data event : " << compteur2 << endl;
+
+
+
+
+  for (int omnum=0; omnum<520; ++omnum) // MW
+    if (rate_simu[omnum] > 0 && rate[omnum] > 0)
+    sncalo->setcontent(omnum, rate_simu[omnum]/(rate[omnum]/1.78));
+    // sncalo->setcontent(omnum, rate[omnum]);
+
+  sncalo->setrange(-1, -1); // to force z axis range
+
+  sncalo->draw();
+  sncalo->draw1();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+}
+
+void sndisplay_calorimeter_sources ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+
+  sncalo->draw_content_label("%.1f");
+
+  int ncalo_tot;
+  std::vector<int> *flag_e_event = new std::vector<int>;
+  std::vector<int> *om_number = new std::vector<int>;
+  std::vector<double> *energyvis_ubc = new std::vector<double>;
+  std::vector<double> *charge = new std::vector<double>;
+  std::vector<int> *flag_charge = new std::vector<int>;
+  std::vector<int> *flag_associated_nohit = new std::vector<int>;
+  std::vector<int> *flag_MW = new std::vector<int>;
+  std::vector<int> *flag_calo_square = new std::vector<int>;
+  std::vector<int> *flag_source_square = new std::vector<int>;
+  std::vector<int> *flag_last_column = new std::vector<int>;
+  std::vector<int> *flag_last_z = new std::vector<int>;
+  std::vector<double> *z_last_gg = new std::vector<double>;
+  std::vector<int> *flag = new std::vector<int>;
+  std::vector<int> *calo_nohit_om_time = new std::vector<int>;
+  std::vector<int> *source_number = new std::vector<int>;
+
+  TFile *file = new TFile("cut_bi_good_gas.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("ncalo_tot",1);
+  tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree->SetBranchStatus("om_num",1);
+  tree->SetBranchAddress("om_num", &om_number);
+  tree->SetBranchStatus("flag",1);
+  tree->SetBranchAddress("flag", &flag);
+  tree->SetBranchStatus("flag_e_event",1);
+  tree->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree->SetBranchStatus("flag_charge",1);
+  tree->SetBranchAddress("flag_charge", &flag_charge);
+  tree->SetBranchStatus("flag_associated_nohit",1);
+  tree->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
+  tree->SetBranchStatus("flag_MW",1);
+  tree->SetBranchAddress("flag_MW", &flag_MW);
+  tree->SetBranchStatus("flag_calo_square",1);
+  tree->SetBranchAddress("flag_calo_square", &flag_calo_square);
+  tree->SetBranchStatus("flag_source_square",1);
+  tree->SetBranchAddress("flag_source_square", &flag_source_square);
+  tree->SetBranchStatus("flag_last_column",1);
+  tree->SetBranchAddress("flag_last_column", &flag_last_column);
+  tree->SetBranchStatus("flag_last_z",1);
+  tree->SetBranchAddress("flag_last_z", &flag_last_z);
+  tree->SetBranchStatus("energyvis_ubc",1);
+  tree->SetBranchAddress("energyvis_ubc", &energyvis_ubc);
+  tree->SetBranchStatus("z_last_gg",1);
+  tree->SetBranchAddress("z_last_gg", &z_last_gg);
+  tree->SetBranchStatus("source_number",1);
+  tree->SetBranchAddress("source_number", &source_number);
+
+  TH2D* Gamma = new TH2D("Gamma","Gamma",520,0,520,1000,0,2);
+
+  int e_compteur;
+  int compteur =0;
+
+  double rate_simu[712];
+  memset (rate_simu, 0, 712*sizeof(double));
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+
+    for (int j = 0; j < flag_e_event->size(); j++) {
+      if (flag_e_event->at(j) == 1 && energyvis_ubc->at(j) > 0.7 ) {
+      // if (flag_e_event->at(j) == 0 && e_compteur > 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+
+        rate_simu[om_number->at(j)]++;
+        compteur++;
+      }
+    }
+  }
+
+  cout << "total simu event : " << compteur << endl;
+  // return;
+  std::vector<long> *timestamp = new std::vector<long>;
+
+  TFile *file2 = new TFile("../cut_974.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("ncalo_tot",1);
+  tree2->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("flag",1);
+  tree2->SetBranchAddress("flag", &flag);
+  tree2->SetBranchStatus("flag_e_event",1);
+  tree2->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree2->SetBranchStatus("flag_charge",1);
+  tree2->SetBranchAddress("flag_charge", &flag_charge);
+  tree2->SetBranchStatus("flag_associated_nohit",1);
+  tree2->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
+  tree2->SetBranchStatus("flag_MW",1);
+  tree2->SetBranchAddress("flag_MW", &flag_MW);
+  tree2->SetBranchStatus("flag_calo_square",1);
+  tree2->SetBranchAddress("flag_calo_square", &flag_calo_square);
+  tree2->SetBranchStatus("flag_source_square",1);
+  tree2->SetBranchAddress("flag_source_square", &flag_source_square);
+  tree2->SetBranchStatus("flag_last_column",1);
+  tree2->SetBranchAddress("flag_last_column", &flag_last_column);
+  tree2->SetBranchStatus("flag_last_z",1);
+  tree2->SetBranchAddress("flag_last_z", &flag_last_z);
+  tree2->SetBranchStatus("charge",1);
+  tree2->SetBranchAddress("charge", &charge);
+  tree2->SetBranchStatus("z_last_gg",1);
+  tree2->SetBranchAddress("z_last_gg", &z_last_gg);
+  tree2->SetBranchStatus("calo_nohit_om_time",1);
+  tree2->SetBranchAddress("calo_nohit_om_time", &calo_nohit_om_time);
+  tree2->SetBranchStatus("energy",1);
+  tree2->SetBranchAddress("energy", &energyvis_ubc);
+  tree2->SetBranchStatus("calo_timestamp",1);
+  tree2->SetBranchAddress("calo_timestamp", &timestamp);
+  tree2->SetBranchStatus("source_number",1);
+  tree2->SetBranchAddress("source_number", &source_number);
+
+  int last_j;
+  double rate[712];
+  memset (rate, 0, 712*sizeof(double));
+  int compteur2 =0;
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    e_compteur = 0;
+
+    for (int j = 0; j < om_number->size(); j++) {
+
+      // float time = abs(timestamp->at(j)-timestamp->at(last_j));
+
+      // if (time < 16) cout << time << " and "
+      if ( energyvis_ubc->at(j)>0.7  && flag_e_event->at(j) == 1)  {
+      // if (time < 16 && flag_e_event->at(j) == 0 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_calo_square->at(j) == 0 && energyvis_ubc->at(j) > 0.22) {
+      // if (energyvis_ubc->at(j) > 0.7 && flag_e_event->at(j) == 1 && ) {
+        // cout << "i: " << i << " : source_number " << source_number->at(j) << " : energy " << energyvis_ubc->at(j)<< endl;
+        rate[om_number->at(j)]++;
+        compteur2++;
+      }
+      // time = 0;
+    }
+  }
+
+  cout << "total data event : " << compteur2 << endl;
+
+  int om;
+  float teres;
+
+  TFile *file3 = new TFile("Eres.root", "READ");
+  TTree* tree3 = (TTree*)file3->Get("Result_tree");
+  tree3->SetBranchStatus("*",0);
+  tree3->SetBranchStatus("eres",1);
+  tree3->SetBranchAddress("eres", &teres);
+  tree3->SetBranchStatus("om",1);
+  tree3->SetBranchAddress("om", &om);
+  std::cout << "/* message */" << '\n';
+
+  double eres[520];
+  memset (eres, 0, 520*sizeof(double));
+  for (int i = 0; i < tree3->GetEntries(); i++) {
+    tree3->GetEntry(i);
+    eres[om] = teres;
+  }
+
+  TH2F* rate_eres = new TH2F("rate_eres","rate_eres", 200, 0, 2, 150,10,25);
+  TH2F* rate_eres_bad = new TH2F("rate_eres_bad_it_zone","rate_eres_bad_it_zone", 200, 0, 2, 150,10,25);
+  TH2F* rate_eres_bad2 = new TH2F("rate_eres_bad_it_other","rate_eres_it_bad_other", 200, 0, 2, 150,10,25);
+  TH2F* rate_eres_bad3 = new TH2F("rate_eres_bad_fr_zone","rate_eres_bad_fr_zone", 200, 0, 2, 150,10,25);
+  TH2F* rate_eres_bad4 = new TH2F("rate_eres_bad_fr_other","rate_eres_bad_fr_other", 200, 0, 2, 150,10,25);
+
+  int bad[9] = {118,120,121,122,123,131,132,133,134};
+  int bad2[4] = {2,5,84,192};
+  int bad3[8] = {508,510,511,512, 513,514,515,516};
+  int bad4[13] = {292,316,330,340,348,366, 368,370,458,470,471,491,495};
+  int c = 0;
+  int c2 = 0;
+  int c3 = 0;
+  int c4 = 0;
+  for (int omnum=0; omnum<520; ++omnum){ // MW
+    if (rate_simu[omnum] > 0 && rate[omnum] > 0){
+      sncalo->setcontent(omnum, rate_simu[omnum]/(rate[omnum]/1.78));
+      if (omnum == bad[c]) {
+        rate_eres_bad->Fill(rate_simu[omnum]/(rate[omnum]/1.78), eres[omnum]);
+        c++;
+      }
+      else if (omnum == bad2[c2]) {
+        rate_eres_bad2->Fill(rate_simu[omnum]/(rate[omnum]/1.78), eres[omnum]);
+        c2++;
+      }
+      else if (omnum == bad3[c3]) {
+        rate_eres_bad3->Fill(rate_simu[omnum]/(rate[omnum]/1.78), eres[omnum]);
+        c3++;
+      }
+      else if (omnum == bad4[c4]) {
+        rate_eres_bad4->Fill(rate_simu[omnum]/(rate[omnum]/1.78), eres[omnum]);
+        c4++;
+      }
+      else if (omnum%13 !=1 && omnum%13!=11) {
+        rate_eres->Fill(rate_simu[omnum]/(rate[omnum]/1.78), eres[omnum]);
+      }
+
+    }
+  }
+  rate_eres->GetXaxis()->SetTitle("Rate simu/data");
+  rate_eres->GetYaxis()->SetTitle("Eres");
+    // sncalo->setcontent(omnum, rate[omnum]);
+  TLegend *legend = new TLegend(0.5,0.7,0.7,0.9);
+  legend->AddEntry(rate_eres, "rate/eres normal OM", "P");
+  legend->AddEntry(rate_eres_bad, "rate/eres bad OM it zone", "P");
+  legend->AddEntry(rate_eres_bad2, "rate/eres bad OM it other", "P");
+  legend->AddEntry(rate_eres_bad3, "rate/eres bad OM fr zone", "P");
+  legend->AddEntry(rate_eres_bad4, "rate/eres bad OM fr other", "P");
+
+  rate_eres->Draw();
+  rate_eres_bad->Draw("same");
+  rate_eres_bad2->Draw("same");
+  rate_eres_bad3->Draw("same");
+  rate_eres_bad4->Draw("same");
+  legend->Draw("same");
+
+  rate_eres->SetMarkerStyle(2);
+  rate_eres_bad->SetMarkerColor(kRed);
+  rate_eres_bad->SetMarkerStyle(8);
+  rate_eres_bad2->SetMarkerColor(kRed);
+  rate_eres_bad2->SetMarkerStyle(4);
+  rate_eres_bad3->SetMarkerColor(kBlue);
+  rate_eres_bad3->SetMarkerStyle(22);
+  rate_eres_bad4->SetMarkerColor(kBlue);
+  rate_eres_bad4->SetMarkerStyle(26);
+  sncalo->setrange(-1, -1); // to force z axis range
+
+  sncalo->draw();
+  sncalo->draw1();
+
+}
+
+void sndisplay_calorimeter_simu_cut_rate ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+
+  sncalo->draw_content_label("%.3f");
+
+  int ncalo_tot;
+  std::vector<int> *flag_e_event = new std::vector<int>;
+  std::vector<int> *om_number = new std::vector<int>;
+  std::vector<double> *energyvis_ubc = new std::vector<double>;
+  std::vector<double> *energy = new std::vector<double>;
+  std::vector<int> *flag_charge = new std::vector<int>;
+  std::vector<int> *flag_associated_nohit = new std::vector<int>;
+  std::vector<int> *flag_MW = new std::vector<int>;
+  std::vector<int> *flag_calo_square = new std::vector<int>;
+  std::vector<int> *flag_source_square = new std::vector<int>;
+  std::vector<int> *flag_last_column = new std::vector<int>;
+  std::vector<int> *flag_last_z = new std::vector<int>;
+
+  TFile *file = new TFile("../cut_974_no.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("ncalo_tot",1);
+  tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("flag_e_event",1);
+  tree->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree->SetBranchStatus("flag_charge",1);
+  tree->SetBranchAddress("flag_charge", &flag_charge);
+  tree->SetBranchStatus("flag_associated_nohit",1);
+  tree->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
+  tree->SetBranchStatus("flag_MW",1);
+  tree->SetBranchAddress("flag_MW", &flag_MW);
+  tree->SetBranchStatus("flag_calo_square",1);
+  tree->SetBranchAddress("flag_calo_square", &flag_calo_square);
+  tree->SetBranchStatus("flag_source_square",1);
+  tree->SetBranchAddress("flag_source_square", &flag_source_square);
+  tree->SetBranchStatus("flag_last_column",1);
+  tree->SetBranchAddress("flag_last_column", &flag_last_column);
+  tree->SetBranchStatus("flag_last_z",1);
+  tree->SetBranchAddress("flag_last_z", &flag_last_z);
+  tree->SetBranchStatus("energy",1);
+  tree->SetBranchAddress("energy", &energy);
 
   int compteur =0;
   double rate_simu[712];
@@ -1817,8 +2314,8 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   for (int i = 0; i < tree->GetEntries()/10; i++) {
     tree->GetEntry(i);
     for (int j = 0; j < flag_e_event->size(); j++) {
-      // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_e_event->at(j) == 1) {
-      if (ncalo_tot < 2 && flag_e_event->at(j) == 1 ) {
+      // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_associated_nohit->at(j)==1 && flag_last_column->at(j) == 1 && flag_calo_square->at(j) == 1 && flag_source_square->at(j) == 1)  {
+      if (ncalo_tot < 2 && flag_e_event->at(j) == 1 && energy->at(j) > 0.7) {
         rate_simu[om_number->at(j)]++;
         compteur++;
       }
@@ -1826,7 +2323,7 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   }
   cout << "total simu event : " << compteur << endl;
 
-  TFile *file2 = new TFile("cut_bi_newest_perfect.root", "READ");
+  TFile *file2 = new TFile("cut_bi.root", "READ");
   TTree* tree2 = (TTree*)file2->Get("Result_tree");
   tree2->SetBranchStatus("*",0);
   tree2->SetBranchStatus("ncalo_tot",1);
@@ -1852,14 +2349,15 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   tree2->SetBranchStatus("energyvis_ubc",1);
   tree2->SetBranchAddress("energyvis_ubc", &energyvis_ubc);
 
-  int compteur2 =0;
+  int compteur2 = 0;
   double rate_simu2[712];
   memset (rate_simu2, 0, 712*sizeof(double));
   for (int i = 0; i < tree2->GetEntries()/10; i++) {
     tree2->GetEntry(i);
     for (int j = 0; j < flag_e_event->size(); j++) {
       // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_e_event->at(j) == 1) {
-      if (ncalo_tot < 2 && flag_e_event->at(j) == 1 ) {
+      // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_associated_nohit->at(j)==1 && flag_last_column->at(j) == 1 && flag_calo_square->at(j) == 1 && flag_source_square->at(j) == 1 ) {
+      if (ncalo_tot < 2 && flag_e_event->at(j) == 1 && energyvis_ubc->at(j) > 0.7) {
         rate_simu2[om_number->at(j)]++;
         compteur2++;
       }
@@ -1867,23 +2365,40 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   }
   cout << "total simu event : " << compteur2 << endl;
 
+  int om;
+  float teres;
 
+  TFile *file3 = new TFile("Eres.root", "READ");
+  TTree* tree3 = (TTree*)file3->Get("Result_tree");
+  tree3->SetBranchStatus("*",0);
+  tree3->SetBranchStatus("eres",1);
+  tree3->SetBranchAddress("eres", &teres);
+  tree3->SetBranchStatus("om",1);
+  tree3->SetBranchAddress("om", &om);
 
-
-  cout << "total data event : " << compteur2 << endl;
-  for (size_t i = 0; i < 520; i++) {
-    std::cout <<"om : " << i << "  rate simu dead = " << rate_simu[i] << " rate simu perfect= " << rate_simu2[i] << '\n';
+  double eres[520];
+  memset (eres, 0, 520*sizeof(double));
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    eres[om] = teres;
   }
 
+  //
+  // cout << "total data event : " << compteur2 << endl;
+  // for (size_t i = 0; i < 520; i++) {
+  //   std::cout <<"om : " << i << "  rate simu dead = " << rate_simu[i] << " rate simu perfect= " << rate_simu2[i] << '\n';
+  // }
 
+  TH2F* rate_eres = new TH2F("rate_eres","rate_eres", 200, 0, 2, 150,10,25);
 
   for (int omnum=0; omnum<520; ++omnum) // MW
-    if (rate_simu[omnum] > 0)
-     sncalo->setcontent(omnum, rate_simu[omnum]/(rate_simu2[omnum]));
+    if (rate_simu[omnum] > 0){
+     sncalo->setcontent(omnum, rate_simu2[omnum]/(rate_simu[omnum]/1.78));
      // sncalo->setcontent(omnum, rate_simu[omnum]);
-
+     rate_eres->Fill(rate_simu2[omnum]/(rate_simu[omnum]), eres[omnum]);
+   }
   // sncalo->setrange(0, 3); // to force z axis range
-
+  rate_eres->Draw();
   sncalo->draw();
   sncalo->draw1();
 
@@ -1894,87 +2409,110 @@ void sndisplay_calorimeter_simu_cut_rate (bool with_palette = true)
   // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
 }
 
-void sndisplay_calorimeter_data_rate (bool with_palette = true)
+void sndisplay_calorimeter_taux_source ()
 {
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+
+  sncalo->draw_content_label("%.0f");
+
+  int ncalo_tot;
+  std::vector<int> *flag_e_event = new std::vector<int>;
+  std::vector<int> *om_number = new std::vector<int>;
+  std::vector<double> *energyvis_ubc = new std::vector<double>;
+  std::vector<double> *energy = new std::vector<double>;
+  std::vector<int> *flag_charge = new std::vector<int>;
+  std::vector<int> *flag_associated_nohit = new std::vector<int>;
+  std::vector<int> *flag_MW = new std::vector<int>;
+  std::vector<int> *flag_calo_square = new std::vector<int>;
+  std::vector<int> *flag_source_square = new std::vector<int>;
+  std::vector<int> *flag_last_column = new std::vector<int>;
+  std::vector<int> *flag_last_z = new std::vector<int>;
+  std::vector<int> *source_number = new std::vector<int>;
+
+  TFile *file = new TFile("../cut_974.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("ncalo_tot",1);
+  tree->SetBranchAddress("ncalo_tot", &ncalo_tot);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("flag_e_event",1);
+  tree->SetBranchAddress("flag_e_event", &flag_e_event);
+  tree->SetBranchStatus("flag_charge",1);
+  tree->SetBranchAddress("flag_charge", &flag_charge);
+  tree->SetBranchStatus("flag_associated_nohit",1);
+  tree->SetBranchAddress("flag_associated_nohit", &flag_associated_nohit);
+  tree->SetBranchStatus("flag_MW",1);
+  tree->SetBranchAddress("flag_MW", &flag_MW);
+  tree->SetBranchStatus("flag_calo_square",1);
+  tree->SetBranchAddress("flag_calo_square", &flag_calo_square);
+  tree->SetBranchStatus("flag_source_square",1);
+  tree->SetBranchAddress("flag_source_square", &flag_source_square);
+  tree->SetBranchStatus("flag_last_column",1);
+  tree->SetBranchAddress("flag_last_column", &flag_last_column);
+  tree->SetBranchStatus("flag_last_z",1);
+  tree->SetBranchAddress("flag_last_z", &flag_last_z);
+  tree->SetBranchStatus("energy",1);
+  tree->SetBranchAddress("energy", &energy);
+  tree->SetBranchStatus("source_number",1);
+  tree->SetBranchAddress("source_number", &source_number);
+
+  int compteur =0;
+  double rate_simu[712];
+  memset (rate_simu, 0, 712*sizeof(double));
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    for (int j = 0; j < flag_e_event->size(); j++) {
+      // if (energyvis_ubc->at(j) > 0.6 && ncalo_tot < 2 && flag_charge->at(j) == 1 && flag_MW->at(j) == 1 && flag_associated_nohit->at(j)==1 && flag_last_column->at(j) == 1 && flag_calo_square->at(j) == 1 && flag_source_square->at(j) == 1)  {
+      // if (flag_e_event->at(j) == 1 && source_number->at(j) !=204 &&  source_number->at(j) !=201 &&source_number->at(j) !=202 &&source_number->at(j) !=203 &&source_number->at(j)) {
+      // if (flag_e_event->at(j) == 1 && (source_number->at(j) ==304 ||  source_number->at(j) ==301 ||source_number->at(j) ==302 ||source_number->at(j) ==303 )) {
+      if (flag_e_event->at(j) == 1 && (source_number->at(j) ==304)) {
+
+        rate_simu[om_number->at(j)]++;
+        compteur++;
+      }
+    }
+  }
+  cout << "total simu event : " << compteur << endl;
+
+  //
+  // cout << "total data event : " << compteur2 << endl;
+  // for (size_t i = 0; i < 520; i++) {
+  //   std::cout <<"om : " << i << "  rate simu dead = " << rate_simu[i] << " rate simu perfect= " << rate_simu2[i] << '\n';
+  // }
+
+
+  for (int omnum=0; omnum<520; ++omnum) // MW
+    if (rate_simu[omnum] > 0){
+     sncalo->setcontent(omnum, (rate_simu[omnum]));
+     // sncalo->setcontent(omnum, rate_simu[omnum]);
+   }
+  // sncalo->setrange(0, 3); // to force z axis range
+  sncalo->draw();
+  sncalo->draw1();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+  // merge IT and FR canvas side by side using image magick (if installed)
+  // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+}
+
+void sndisplay_calorimeter_taux_rapport()
+{
+  bool with_palette = true;
   sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
 
   sncalo->draw_content_label("%.1f");
 
+  double ncal[520] = {0,1/2.7,1/0.8,1/0.9,1/0.7,1/0.8,1/0.8,1/0.9,1/0.8,1/0.9,1/0.9,1/2.6,0,0,1/2.2,1/0.8,1/0.9,1/0.9,1/1.1,1/0.9,1/0.9,1,1/0.9,1/0.9,1/4.,0,0,1/2.2,1/0.8,1/0.8,1/0.9,1/0.8,1/0.9,1/0.9,1,1/0.9,1/0.9,1/3.3,0,0,1/3.0,1/0.9,1/0.8,1/0.8,1/0.8,1/0.9,1/0.8,1/0.9,1,1/0.9,1/4.1,0,0,1/2.3,1/0.8,1/0.8,1/0.9,1/0.8,1/0.8,1/0.9,1/0.8,1/0.8,1/0.9,1/3.0,0,0,1/2.2,1/0.9,1/0.9,1/0.9,1/0.9,1/0.8,1/0.7,1/0.9,0,1/0.9,1/2.6,0,0,1/2.3,0,1/0.7,1/0.7,1/0.7,1/0.8,1/0.8,1/0.9,1/0.8,1/0.8,1/4.9,0,0,1/2.5,1/0.8,1/0.8,1/0.8,1/0.7,1/0.8,0,1/0.9,1/0.9,1/0.9,1/3.7,0,0,1/1.9,1/0.8,1/0.8,1/0.9,1/0.9,1/0.8,1/0.8,1/0.9,1/0.9,1/0.9,1/2.7,0,0,1/4.3,0,1/1.2,1/1.1,1,1/1.1,1/0.9,1/0.9,1/0.9,1,1/4.5,0,0,1/4.,1/1.5,1/1.2,1,1/1.1,0,1,1/0.9,1/0.9,1,1/2.6,0,0,1/1.8,1/0.8,0,1/0.8,1/0.8,1/0.9,1,1/0.8,1/0.9,1/0.9,1/2.6,0,0,1/2.9,1/0.8,1/0.8,1/0.8,1/0.8,1/0.9,1/0.9,1,1/0.9,1/0.9,1/3.5,0,0,1/3.1,1/0.9,1/0.8,1/0.9,1/1.1,1/0.8,1,1/0.8,1/0.7,1/0.9,1/3.,0,0,1/2.9,1/0.8,1/0.8,1/0.8,1,1/0.9,1/0.9,1,1/0.9,1/0.9,1/3.4,0,0,1/2.4,1/0.8,1/0.7,1/0.8,1/0.7,1/0.8,1/0.9,1/0.9,1/0.9,1/0.9,1/2.8,0,0,1/3.2,1/1.3,1/1.1,1/1.1,1,1,1,1,1/1.1,1,1/3.6,0,0,1/2.1,1/0.7,1/0.9,1/0.8,1/0.9,1/0.9,1,1,1,1,1/2.5,0,0,1/2.3,1/0.8,1,1/0.9,1,1/0.9,1,1,1/0.9,1/1.1,1/3.4,0,0,1/2.2,1/0.9,1/1.1,1,1,1/0.9,1,1/0.9,1/0.9,1/0.8,1/3.3,0,0,1/2.,1/0.8,1/1.1,1/0.9,1/1.2,1/1.1,1/0.9,1/0.6,1/0.7,1,1/3.3,0,0,1/2.8,1/0.9,1/0.9,1/0.9,1/0.9,1/0.8,1/1.1,1/0.9,1,1,1/2.4,0,0,1/2.2,1/0.9,1/0.9,1,1,1/0.9,1/1.1,1,1/0.9,1/0.9,1/4.,0,0,1/3.3,1,1/0.9,1,1/0.8,1,1.1,1/0.8,1,1,1/3.4,0,0,1/2.7,1,1/0.8,1/0.8,1/0.8,0,1/0.8,1/0.8,1/0.7,1/0.9,1/2.7,0,0,1/2.3,1/0.9,1,1/0.9,1,1/0.8,1/0.8,1/0.9,1/0.8,1/0.9,1/2.7,0,0,1/2.3,1,1/0.8,1/0.9,1/0.9,1/0.8,1/0.8,1/0.7,1/0.9,1/1.1,1/3.1,0,0,1/3.,1/0.9,1/0.9,1/1,1/0.9,1/0.8,1/0.8,1/0.8,1/0.8,1/0.9,1/3.1,0,0,1/2.9,1/0.7,1/1.1,1/0.9,0,1/0.9,1/1.1,1/0.9,1/0.9,1,1/3.4,0,0,1/2.6,1/0.9,1/0.8,1,1/0.8,1,1/0.9,1/0.8,1/0.9,1,1/4.9,0,0,1/2.8,1/0.8,1/0.9,1,1/0.8,1,1/0.9,1/0.9,1/0.9,1,1/3.4,0,0,1/2.8,1/0.9,1,1/0.9,1/0.8,1/0.9,1,1/0.9,1,1/0.9,1/2.9,0,0,1/3.2,1/0.9,1/0.9,1/0.8,1,1/0.9,1,1/0.8,1,1/0.9,1/4.1,0,0,1/2.1,1/0.9,1/0.9,1/0.9,1/0.8,1/0.8,1/0.9,1,1,1,1/3.5,0,0,1/2.2,1/0.91,1/0.9,1,1,1/0.9,1,1/0.8,1,1,1/3.3,0,0,1/2.6,1/0.8,1/0.9,1/0.9,1/1.1,0,1/0.9,1/1.1,1/1.2,1,1/2.8,0,0,1/3.,1/0.8,1/0.9,1/0.9,1,1,1/1.1,1/1.2,1/1.1,1/1.1,1/4.9,0,0,1/1.9,1/0.8,1/0.9,1/0.8,1/0.8,1/0.8,1/0.9,1/0.7,1/0.7,1/0.9,1/2.3,0,0,1/2.2,1/0.8,1/0.8,1/0.8,1/0.9,1/0.9,1/0.9,1/0.9,1/0.9,1,1/3.6,0,0,1/2.2,1/1.6,1/1.8,1/1.3,1/2.1,1/1.7,1/1.7,1/1.8,1/1.7,1/1.2,1/2.8,0};
 
-  std::vector<int> *calo_type = new std::vector<int>;
-  std::vector<int> *calo_side = new std::vector<int>;
-  std::vector<int> *calo_wall = new std::vector<int>;
-  std::vector<int> *calo_column = new std::vector<int>;
-  std::vector<int> *calo_row = new std::vector<int>;
-  std::vector<int> *calo_charge = new std::vector<int>;
-  TFile *file = new TFile("snemo_run-974_udd.root", "READ");
-  TTree* tree = (TTree*)file->Get("SimData");
-  tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("digicalo.type",1);
-  tree->SetBranchAddress("digicalo.type", &calo_type);
-  tree->SetBranchStatus("digicalo.side",1);
-  tree->SetBranchAddress("digicalo.side", &calo_side);
-  tree->SetBranchStatus("digicalo.wall",1);
-  tree->SetBranchAddress("digicalo.wall", &calo_wall);
-  tree->SetBranchStatus("digicalo.column",1);
-  tree->SetBranchAddress("digicalo.column", &calo_column);
-  tree->SetBranchStatus("digicalo.row",1);
-  tree->SetBranchAddress("digicalo.row", &calo_row);
-  tree->SetBranchStatus("digicalo.charge",1);
-  tree->SetBranchAddress("digicalo.charge", &calo_charge);
-
-
-
-  double rate[712];
-  memset (rate, 0, 712*sizeof(double));
-  for (int i = 0; i < tree->GetEntries()/10; i++) {
-    tree->GetEntry(i);
-    // cout << "size = " << om_number->size() << endl;
-    for (int j = 0; j < calo_column->size(); j++) {
-      if (calo_type->at(j) == 0 && -calo_charge->at(j)/22000. > 0.6) {
-        rate[calo_side->at(j)*260 + calo_column->at(j)*13 + calo_row->at(j)]++;
-        // cout << "/k" << endl;
-      }
-    }
-  }
-
-  std::vector<int> *om_number = new std::vector<int>;
-  std::vector<double> *energyvis_ubc = new std::vector<double>;
-
-  TFile *file2 = new TFile("data/simu_Bi_207.root", "READ");
-  TTree* tree2 = (TTree*)file2->Get("Result_tree");
-  tree2->SetBranchStatus("*",0);
-  tree2->SetBranchStatus("om_id",1);
-  tree2->SetBranchAddress("om_id", &om_number);
-  tree2->SetBranchStatus("energyvis_ubc",1);
-  tree2->SetBranchAddress("energyvis_ubc", &energyvis_ubc);
-
-
-  double rate_simu[712];
-  memset (rate_simu, 0, 712*sizeof(double));
-  for (int i = 0; i < tree2->GetEntries()/10; i++) {
-    tree2->GetEntry(i);
-    // cout << "size = " << om_number->size() << endl;
-    for (int j = 0; j < om_number->size(); j++) {
-      if (energyvis_ubc->at(j) > 0.6) {
-        rate_simu[om_number->at(j)]++;
-        // cout << "ok" << endl;
-      }
-    }
-  }
-
-  for (size_t i = 0; i < 520; i++) {
-    std::cout << "rate simu = " << rate_simu[i] << " rate = " << rate[i] << '\n';
-  }
-
-
-
-  for (int omnum=0; omnum<520; ++omnum) // MW
-    if (rate_simu[omnum] > 0)
-     sncalo->setcontent(omnum, 1.78*rate_simu[omnum]/rate[omnum]);
-
-  // sncalo->setrange(0, 2); // to force z axis range
-
+  for (int omnum=0; omnum<520; ++omnum){ // MW
+     sncalo->setcontent(omnum,ncal[omnum]);
+     // sncalo->setcontent(omnum, rate_simu[omnum]);
+   }
+  // sncalo->setrange(0, 3); // to force z axis range
   sncalo->draw();
   sncalo->draw1();
 
@@ -1984,6 +2522,593 @@ void sndisplay_calorimeter_data_rate (bool with_palette = true)
   // merge IT and FR canvas side by side using image magick (if installed)
   // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
 }
+
+
+
+void sndisplay_calorimeter_energy_res_bdf ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+  sncalo->draw_content_label("%.1f");
+
+  int om_number;
+  double FWHM;
+  double sigma;
+  double Chi2_ndf, correction;
+
+  double ubc_tab[520];
+  memset(ubc_tab, 0, 520*sizeof(double));
+  double mean_tab_simu[520];
+  memset(mean_tab_simu, 0, 520*sizeof(double));
+  TH1D* distrib = new TH1D("distrib", "distrib", 100, 8,25);
+
+  TFile *file2 = new TFile("eres_1055.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("FWHM",1);
+  tree2->SetBranchAddress("FWHM", &FWHM);
+  tree2->SetBranchStatus("sigma",1);
+  tree2->SetBranchAddress("sigma", &sigma);
+  tree2->SetBranchStatus("Chi2_ndf",1);
+  tree2->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+
+  double means_tab[520];
+  double sigmas_tab[520];
+  memset (means_tab, 0, 520*sizeof(double));
+  memset (sigmas_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    if (FWHM > 0) {
+      means_tab[om_number] = FWHM;
+      sigmas_tab[om_number] = sigma;
+    }
+  }
+  int position = 0;
+  TFile *file = new TFile("/eres_1055_bdf.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("FWHM",1);
+  tree->SetBranchAddress("FWHM", &FWHM);
+  tree->SetBranchStatus("sigma",1);
+  tree->SetBranchAddress("sigma", &sigma);
+  tree->SetBranchStatus("Chi2_ndf",1);
+  tree->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+  tree->SetBranchStatus("position",1);
+  tree->SetBranchAddress("position", &position);
+
+  double mean_tab[520];
+  double sigma_tab[520];
+  memset (mean_tab, 0, 520*sizeof(double));
+  memset (sigma_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (FWHM > 0 && position == 0) {
+      mean_tab[om_number] = FWHM;
+      sigma_tab[om_number] = sigma;
+    }
+  }
+
+  double gain;
+  float eres;
+  int om;
+  TFile *newfile = new TFile("eres_1055_bdf.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("gain", &gain);
+  Result_tree.Branch("eres", &eres);
+  Result_tree.Branch("om", &om);
+
+  std::ofstream outFile("eres_1055_bdf.txt");
+  outFile << "OM" << "\t"<< "FWHM @ 1MeV" << endl;
+
+  for (int omnum=0; omnum<520; ++omnum) // MW
+    if (mean_tab[omnum] > 0){
+     sncalo->setcontent(omnum, sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+     if (omnum/13 != 13 && omnum/13 != 33 && omnum != 131 && omnum != 310) {
+       distrib->Fill(sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+     }
+
+     eres = sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum];
+     om = omnum;
+     gain = mean_tab[omnum];
+     outFile << om << "\t"<< eres << endl;
+
+     Result_tree.Fill();
+     // sncalo->setcontent(omnum, 2.36*sigma_tab[omnum]/mean_tab[omnum]);
+   }
+  // sncalo->setrange(0, 2); // to force z axis range
+  distrib->Draw();
+  // return;
+  sncalo->draw();
+  sncalo->draw1();
+  outFile.close();
+
+  newfile->cd();
+  Result_tree.Write();
+  newfile->Close();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+  // merge IT and FR canvas side by side using image magick (if installed)
+  // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+}
+
+void sndisplay_calorimeter_energy_res ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+  sncalo->draw_content_label("%.1f");
+
+  int om_number;
+  double mean;
+  double sigma;
+  double Chi2_ndf, correction;
+
+  double ubc_tab[520];
+  memset(ubc_tab, 0, 520*sizeof(double));
+  double mean_tab_simu[520];
+  memset(mean_tab_simu, 0, 520*sizeof(double));
+  TH1D* distrib = new TH1D("distrib", "distrib", 100, 8,15);
+
+  TFile *ubc_file = new TFile("Bi_fit/ubc_corrector.root", "READ");
+  TTree* ubc_tree = (TTree*)ubc_file->Get("Result_tree");
+  ubc_tree->SetBranchStatus("*",0);
+  ubc_tree->SetBranchStatus("om_number",1);
+  ubc_tree->SetBranchAddress("om_number", &om_number);
+  ubc_tree->SetBranchStatus("correction",1);
+  ubc_tree->SetBranchAddress("correction", &correction);
+  ubc_tree->SetBranchStatus("mean",1);
+  ubc_tree->SetBranchAddress("mean", &mean);
+
+  for (size_t i = 0; i < 520; i++) {
+    ubc_tree->GetEntry(i);
+    ubc_tab[om_number] = correction;
+    mean_tab_simu[om_number] = mean;
+  }
+
+  TFile *file2 = new TFile("Bi_fit/fitted_bi_gas.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("mean",1);
+  tree2->SetBranchAddress("mean", &mean);
+  tree2->SetBranchStatus("sigma",1);
+  tree2->SetBranchAddress("sigma", &sigma);
+  tree2->SetBranchStatus("Chi2_ndf",1);
+  tree2->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+
+  double means_tab[520];
+  double sigmas_tab[520];
+  memset (means_tab, 0, 520*sizeof(double));
+  memset (sigmas_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    if (mean > 0) {
+      means_tab[om_number] = mean;
+      sigmas_tab[om_number] = sigma;
+    }
+  }
+
+  TFile *file = new TFile("Bi_fit/fitted_bi_gas_ubc.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("mean",1);
+  tree->SetBranchAddress("mean", &mean);
+  tree->SetBranchStatus("sigma",1);
+  tree->SetBranchAddress("sigma", &sigma);
+  tree->SetBranchStatus("Chi2_ndf",1);
+  tree->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+
+  double mean_tab[520];
+  double sigma_tab[520];
+  memset (mean_tab, 0, 520*sizeof(double));
+  memset (sigma_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (mean > 0) {
+      mean_tab[om_number] = mean;
+      sigma_tab[om_number] = sigma;
+    }
+  }
+
+  float eres;
+  int om;
+  TFile *newfile = new TFile("eres_simu_ubc.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("eres", &eres);
+  Result_tree.Branch("om", &om);
+
+  std::ofstream outFile("eres_simu_ubc.txt");
+  outFile << "OM" << "\t"<< "FWHM @ 1MeV" << endl;
+  for (int omnum=0; omnum<520; ++omnum) // MW
+    if (mean_tab[omnum] > 0){
+     sncalo->setcontent(omnum, sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+      if (omnum/13 != 13 && omnum/13 != 33 && omnum != 131 && omnum != 310 & omnum != 74 & omnum != 80 & omnum != 98 & omnum != 119 & omnum != 136 & omnum != 146 & omnum != 461 & omnum != 369 & omnum != 318) {
+        distrib->Fill(sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+     }
+     eres = sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum];
+     om = omnum;
+     outFile << om << "\t"<< eres << endl;
+
+     Result_tree.Fill();
+     // sncalo->setcontent(omnum, 2.36*sigma_tab[omnum]/mean_tab[omnum]);
+  }
+  distrib->Draw();
+
+  sncalo->draw();
+  sncalo->draw1();
+  outFile.close();
+
+  newfile->cd();
+  Result_tree.Write();
+  newfile->Close();
+}
+
+void sndisplay_calorimeter_energy_res_data ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+  sncalo->draw_content_label("%.1f");
+
+  int om_number;
+  double mean;
+  double sigma;
+  double Chi2_ndf, correction;
+
+  double ubc_tab[520];
+  memset(ubc_tab, 0, 520*sizeof(double));
+  double mean_tab_simu[520];
+  memset(mean_tab_simu, 0, 520*sizeof(double));
+  TH1D* distrib = new TH1D("distrib", "distrib", 100, 0,20);
+
+  TFile *file2 = new TFile("Bi_fit/fitted_bi_gas.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number);
+  tree2->SetBranchStatus("mean",1);
+  tree2->SetBranchAddress("mean", &mean);
+  tree2->SetBranchStatus("sigma",1);
+  tree2->SetBranchAddress("sigma", &sigma);
+  tree2->SetBranchStatus("Chi2_ndf",1);
+  tree2->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+
+  double means_tab[520];
+  double sigmas_tab[520];
+  memset (means_tab, 0, 520*sizeof(double));
+  memset (sigmas_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    if (mean > 0) {
+      means_tab[om_number] = mean;
+      sigmas_tab[om_number] = sigma;
+    }
+  }
+  int position = 0;
+  TFile *file = new TFile("../Bi_fit/fit_geom.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("mean",1);
+  tree->SetBranchAddress("mean", &mean);
+  tree->SetBranchStatus("sigma",1);
+  tree->SetBranchAddress("sigma", &sigma);
+  tree->SetBranchStatus("Chi2_ndf",1);
+  tree->SetBranchAddress("Chi2_ndf", &Chi2_ndf);
+  tree->SetBranchStatus("position",1);
+  tree->SetBranchAddress("position", &position);
+
+  double mean_tab[520];
+  double sigma_tab[520];
+  memset (mean_tab, 0, 520*sizeof(double));
+  memset (sigma_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (mean > 0 && position == 0) {
+      // cout <<  mean_tab[omnum] << endl;
+      mean_tab[om_number] = mean;
+      sigma_tab[om_number] = sigma;
+    }
+  }
+
+  double gain;
+  float eres;
+  int om;
+  TFile *newfile = new TFile("eres_974_centre_ubc.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("gain", &gain);
+  Result_tree.Branch("eres", &eres);
+  Result_tree.Branch("om", &om);
+
+  std::ofstream outFile("eres_974_centre_ubc.txt");
+  outFile << "OM" << "\t"<< "FWHM @ 1MeV" << endl;
+
+  for (int omnum=0; omnum<520; ++omnum){ // MW
+    if (mean_tab[omnum] > 0){
+      sncalo->setcontent(omnum, sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+      if (omnum/13 != 13 && omnum/13 != 33 && omnum != 131 && omnum != 310) {
+        distrib->Fill(sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum]);
+      }
+    }
+    eres = sqrt(means_tab[omnum])*235.482*sigma_tab[omnum]/mean_tab[omnum];
+    if (eres > 100) cout << omnum << " -> " << eres << endl;
+    om = omnum;
+    gain = mean_tab[omnum];
+    outFile << om << "\t"<< eres << endl;
+
+    Result_tree.Fill();
+    // sncalo->setcontent(omnum, 2.36*sigma_tab[omnum]/mean_tab[omnum]);
+  }
+  // sncalo->setrange(0, 2); // to force z axis range
+  distrib->Draw();
+  // return;
+  sncalo->draw();
+  sncalo->draw1();
+  outFile.close();
+
+  newfile->cd();
+  Result_tree.Write();
+  newfile->Close();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+  // merge IT and FR canvas side by side using image magick (if installed)
+  // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+}
+
+void sndisplay_calorimeter_energy_res_data_intercept ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+  sncalo->draw_content_label("%.1f");
+
+  int om_number;
+  double eres_1_MeV, mean;
+
+  TFile *file = new TFile("../Bi_fit/fit_histo/fitted_bi_974_edep_AI.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("eres_1MeV",1);
+  tree->SetBranchAddress("eres_1MeV", &eres_1_MeV);
+  tree->SetBranchStatus("mean",1);
+  tree->SetBranchAddress("mean", &mean);
+
+  double mean_tab[520];
+  memset (mean_tab, 0, 520*sizeof(double));
+  double eres_tab[520];
+  memset (eres_tab, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (eres_1_MeV > 0) {
+      // cout <<  mean_tab[omnum] << endl;
+      mean_tab[om_number] = mean;
+      eres_tab[om_number] = eres_1_MeV;
+    }
+  }
+
+  double gain;
+  float eres;
+  int om;
+  TFile *newfile = new TFile("eres_974_intercept.root", "RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("gain", &gain);
+  Result_tree.Branch("eres", &eres);
+  Result_tree.Branch("om", &om);
+
+  std::ofstream outFile("eres_974_intercep.txt");
+  outFile << "OM" << "\t"<< "FWHM @ 1MeV" << endl;
+
+  for (int omnum=0; omnum<520; ++omnum){ // MW
+    if (eres_tab[omnum] > 0){
+      sncalo->setcontent(omnum, eres_tab[omnum]);
+    }
+    eres = eres_tab[omnum];
+    om = omnum;
+    gain = mean_tab[omnum];
+    outFile << om << "\t"<< eres << endl;
+
+    Result_tree.Fill();
+    // sncalo->setcontent(omnum, 2.36*sigma_tab[omnum]/mean_tab[omnum]);
+  }
+  // sncalo->setrange(0, 2); // to force z axis range
+  // return;
+  sncalo->draw();
+  sncalo->draw1();
+  outFile.close();
+
+  newfile->cd();
+  Result_tree.Write();
+  newfile->Close();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+  // merge IT and FR canvas side by side using image magick (if installed)
+  // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+}
+
+void sndisplay_calorimeter_energy_res_rate ()
+{
+  bool with_palette = true;
+  sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+  sncalo->draw_content_label("%.1f");
+
+  int om_number;
+  float eres_1_MeV, mean;
+
+  TFile *file = new TFile("eres_974_intercept.root", "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om",1);
+  tree->SetBranchAddress("om", &om_number);
+  tree->SetBranchStatus("eres",1);
+  tree->SetBranchAddress("eres", &eres_1_MeV);
+
+  double eres_tab_data[520];
+  memset (eres_tab_data, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (eres_1_MeV > 0) {
+      eres_tab_data[om_number] = eres_1_MeV;
+    }
+  }
+  std::cout << "eres data " << eres_tab_data[10] << '\n';
+
+
+
+  TFile *file2 = new TFile("eres_simu_ubc.root", "READ");
+  TTree* tree2 = (TTree*)file2->Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om",1);
+  tree2->SetBranchAddress("om", &om_number);
+  tree2->SetBranchStatus("eres",1);
+  tree2->SetBranchAddress("eres", &eres_1_MeV);
+
+  double eres_tab_simu[520];
+  memset (eres_tab_simu, 0, 520*sizeof(double));
+
+  for (int i = 0; i < tree2->GetEntries(); i++) {
+    tree2->GetEntry(i);
+    if (eres_1_MeV > 0) {
+      eres_tab_simu[om_number] = eres_1_MeV;
+    }
+  }
+  std::cout << "eres simu " << eres_tab_simu[10] << '\n';
+  for (int omnum=0; omnum<520; ++omnum){ // MW
+    if (eres_tab_simu[omnum] > 0 && eres_tab_data[omnum] > 0){
+      sncalo->setcontent(omnum, eres_tab_data[omnum]-eres_tab_simu[omnum]);
+    }
+  }
+  // sncalo->setrange(0, 2); // to force z axis range
+  // return;
+  sncalo->draw();
+  sncalo->draw1();
+
+  // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+  // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+
+  // merge IT and FR canvas side by side using image magick (if installed)
+  // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+}
+
+
+
+// void sndisplay_calorimeter_data_comp ()
+// {
+//   bool with_palette = true;
+//   sncalo = new sndisplay::calorimeter ("sndiplay_test", with_palette);
+//
+//   sncalo->draw_content_label("%.3f");
+//
+//
+//   std::vector<int> *calo_type = new std::vector<int>;
+//   std::vector<int> *calo_side = new std::vector<int>;
+//   std::vector<int> *calo_wall = new std::vector<int>;
+//   std::vector<int> *calo_column = new std::vector<int>;
+//   std::vector<int> *calo_row = new std::vector<int>;
+//   std::vector<int> *calo_charge = new std::vector<int>;
+//   std::vector<int> *calo_ampl = new std::vector<int>;
+//
+//   TFile *file = new TFile("../data/snemo_run-974_udd.root", "READ");
+//   TTree* tree = (TTree*)file->Get("SimData");
+//   tree->SetBranchStatus("*",0);
+//   tree->SetBranchStatus("digicalo.type",1);
+//   tree->SetBranchAddress("digicalo.type", &calo_type);
+//   tree->SetBranchStatus("digicalo.side",1);
+//   tree->SetBranchAddress("digicalo.side", &calo_side);
+//   tree->SetBranchStatus("digicalo.wall",1);
+//   tree->SetBranchAddress("digicalo.wall", &calo_wall);
+//   tree->SetBranchStatus("digicalo.column",1);
+//   tree->SetBranchAddress("digicalo.column", &calo_column);
+//   tree->SetBranchStatus("digicalo.row",1);
+//   tree->SetBranchAddress("digicalo.row", &calo_row);
+//   tree->SetBranchStatus("digicalo.charge",1);
+//   tree->SetBranchAddress("digicalo.charge", &calo_charge);
+//   tree->SetBranchStatus("digicalo.peakamplitude",1);
+//   tree->SetBranchAddress("digicalo.peakamplitude", &calo_ampl);
+//
+//   double rate[712];
+//   memset (rate, 0, 712*sizeof(double));
+//   for (int i = 0; i < tree->GetEntries()/10; i++) {
+//     tree->GetEntry(i);
+//     // cout << "size = " << om_number->size() << endl;
+//     for (int j = 0; j < calo_column->size(); j++) {
+//       if (calo_type->at(j) == 0 && -calo_ampl->at(j) > 250) {
+//         rate[calo_side->at(j)*260 + calo_column->at(j)*13 + calo_row->at(j)]++;
+//         // cout << "/k" << endl;
+//       }
+//     }
+//   }
+//
+//   std::vector<int> *om_number = new std::vector<int>;
+//   std::vector<int> *flag_e_event = new std::vector<int>;
+//
+//   TFile *file2 = new TFile("../cut_974.root", "READ");
+//   TTree* tree2 = (TTree*)file2->Get("Result_tree");
+//   tree2->SetBranchStatus("*",0);
+//   tree2->SetBranchStatus("om_number",1);
+//   tree2->SetBranchAddress("om_number", &om_number);
+//   tree2->SetBranchStatus("charge",1);
+//   tree2->SetBranchAddress("charge", &calo_charge);
+//   tree2->SetBranchStatus("amplitude",1);
+//   tree2->SetBranchAddress("amplitude", &calo_ampl);
+//   tree2->SetBranchStatus("flag_e_event",1);
+//   tree2->SetBranchAddress("flag_e_event", &flag_e_event);
+//
+//   double rate_cut[712];
+//   memset (rate_cut, 0, 712*sizeof(double));
+//   for (int i = 0; i < tree2->GetEntries()/10; i++) {
+//     tree2->GetEntry(i);
+//     // cout << "size = " << om_number->size() << endl;
+//     for (int j = 0; j < om_number->size(); j++) {
+//       if (calo_charge->at(j) > 0 && flag_e_event->at(j) == 1 && calo_ampl->at(j) > 250) {
+//         rate_cut[om_number->at(j)]++;
+//         // cout << "ok" << endl;
+//       }
+//     }
+//   }
+//
+//   for (size_t i = 0; i < 520; i++) {
+//     std::cout << "rate cut = " << rate_cut[i] << " rate = " << rate[i] << '\n';
+//   }
+//
+//
+//
+//   for (int omnum=0; omnum<520; ++omnum) // MW
+//     if ( rate[omnum] > 0)
+//      sncalo->setcontent(omnum, rate_cut[omnum]/rate[omnum]);
+//
+//   // sncalo->setrange(0, 2); // to force z axis range
+//
+//   sncalo->draw();
+//   sncalo->draw1();
+//
+//   // sncalo->canvas_it->SaveAs("sndisplay-calorimeter-test-it.png");
+//   // sncalo->canvas_fr->SaveAs("sndisplay-calorimeter-test-fr.png");
+//
+//   // merge IT and FR canvas side by side using image magick (if installed)
+//   // gSystem->Exec("which convert > /dev/null && convert sndisplay-calorimeter-test-it.png sndisplay-calorimeter-test-fr.png +append sndisplay-calorimeter-test.png");
+// }
+
 
 ////////////////////////////////////////////////////////////////
 
